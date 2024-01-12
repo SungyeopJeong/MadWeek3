@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/node.dart';
+import 'package:week3/views.dart/stellar_view.dart';
 
 void main() {
   runApp(const MainApp());
@@ -24,9 +25,10 @@ class _MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: Scaffold(
-        body: InteractiveViewer(
+        body: StellarView(),
+        /*body: InteractiveViewer(
           child: CallbackShortcuts(
             bindings: <ShortcutActivator, VoidCallback>{
               const SingleActivator(LogicalKeyboardKey.keyI): () {
@@ -95,7 +97,7 @@ class _MainAppState extends State<MainApp> {
           },
           shape: const CircleBorder(),
           child: const Icon(Icons.insights),
-        ),
+        ),*/
       ),
     );
   }
