@@ -1,31 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:week3/models/node.dart';
 
 class Edge {
-  Offset start, end;
+  Node node1, node2;
 
-  Edge({required this.start, required this.end});
+  Edge(this.node1, this.node2);
 
   @override
   bool operator ==(Object other) {
     if (other is! Edge) return false;
-    return start == other.start && end == other.end;
+    return (node1 == other.node1 && node2 == other.node2) ||
+        (node1 == other.node2 && node2 == other.node1);
   }
 
   @override
-  int get hashCode => Object.hash(start, end);
-}
-
-class EdgeIndexed {
-  final int startIdx, endIdx;
-
-  EdgeIndexed({required this.startIdx, required this.endIdx});
-
-  @override
-  bool operator ==(Object other) {
-    if (other is! EdgeIndexed) return false;
-    return startIdx == other.startIdx && endIdx == other.endIdx;
-  }
-
-  @override
-  int get hashCode => Object.hash(startIdx, endIdx);
+  int get hashCode => Object.hash(node1, node2);
 }
