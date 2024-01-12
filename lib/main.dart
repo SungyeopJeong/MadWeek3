@@ -36,6 +36,7 @@ class _MainAppState extends State<MainApp> {
               }
             },
             child: Focus(
+              autofocus: true,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onTapDown: (details) {
