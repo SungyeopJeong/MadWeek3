@@ -100,7 +100,7 @@ class _MainAppState extends State<MainApp> {
                                 child: GestureDetector(
                                   onPanUpdate: (details) {
                                     setState(() {
-                                      list[e.$1] = details.globalPosition;
+                                      list[e.$1] += details.delta;
                                     });
                                   },
                                   onTap: () {
