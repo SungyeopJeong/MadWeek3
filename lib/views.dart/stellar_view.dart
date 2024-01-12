@@ -36,7 +36,7 @@ class _StellarViewState extends State<StellarView> {
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.keyI): () {
             setState(() {
-              temp = Node(mouse, hover: true);
+              temp = Node(mouse, hover: true); //현재 마우스 위치에 따라 움직일 temp Node 생성
             });
           }
         },
@@ -59,8 +59,15 @@ class _StellarViewState extends State<StellarView> {
                       });
                     }
                   },
+                  onSecondaryTap: () {
+                    // 마우스 오른쪽 클릭 이벤트 처리
+                    setState(() {
+                      temp = null; // 별 생성 모드 취소
+                    });
+                  },
                   child: MouseRegion(
                     onHover: (details) {
+                      //여기서 temp가 현재 마우스의 위치를 따라가도록 함
                       setState(() {
                         mouse = details.localPosition;
                         temp?.pos = details.localPosition;
