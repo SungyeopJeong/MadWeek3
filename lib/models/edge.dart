@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Edge {
-  final Offset start, end;
+  Offset start, end;
 
   Edge({required this.start, required this.end});
 
@@ -13,4 +13,19 @@ class Edge {
 
   @override
   int get hashCode => Object.hash(start, end);
+}
+
+class EdgeIndexed {
+  final int startIdx, endIdx;
+
+  EdgeIndexed({required this.startIdx, required this.endIdx});
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! EdgeIndexed) return false;
+    return startIdx == other.startIdx && endIdx == other.endIdx;
+  }
+
+  @override
+  int get hashCode => Object.hash(startIdx, endIdx);
 }
