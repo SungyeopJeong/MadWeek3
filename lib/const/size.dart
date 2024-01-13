@@ -1,3 +1,4 @@
+const planetSize = 9.0;
 const starSize = 18.0;
 const areaSize = 36.0;
 const orbitSize = 72.0;

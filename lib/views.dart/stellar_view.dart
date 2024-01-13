@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_const_constructors
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:week3/const/size.dart';
@@ -14,14 +16,12 @@ class StellarView extends StatefulWidget {
   State<StellarView> createState() => _StellarViewState();
 }
 
-class _StellarViewState extends State<StellarView> {
+class _StellarViewState extends State<StellarView>
+    with TickerProviderStateMixin {
   List<Node> nodes = [];
   List<Edge> edges = [];
-  Node? temp;
-  Widget? original;
+  Node? origin;
   Mode mode = Mode.none;
-  double scale = 1.0;
-  Offset mouse = Offset.zero;
   bool blackholeEnabled = false;
 
   bool isIn(Offset leftTop, Offset rightBottom, Offset target, bool isCircle) {
@@ -40,7 +40,7 @@ class _StellarViewState extends State<StellarView> {
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.keyI): () {
             setState(() {
-              temp = Node(mouse, showArea: true);
+              mode = Mode.add;
             });
           }
         },
@@ -49,50 +49,48 @@ class _StellarViewState extends State<StellarView> {
           child: Stack(
             children: [
               InteractiveViewer(
-                onInteractionUpdate: (details) {
-                  setState(() {
-                    scale = details.scale;
-                  });
-                },
                 child: GestureDetector(
                   onTapDown: (details) {
-                    if (temp != null) {
+                    if (mode == Mode.add) {
                       setState(() {
-                        nodes.add(Node(details.localPosition));
-                        temp = null;
+                        nodes.add(
+                          Node(details.localPosition)
+                            ..planetAnimation = AnimationController(
+                              vsync: this,
+                              upperBound: 2 * pi,
+                              duration: Duration(seconds: 10),
+                            ),
+                        );
+                        mode = Mode.none;
                       });
                     }
                   },
                   onSecondaryTap: () {
                     // 마우스 오른쪽 클릭 이벤트 처리
                     setState(() {
-                      temp = null; // 별 생성 모드 취소
+                      mode = Mode.none; // 별 생성 모드 취소
                     });
                   },
                   child: MouseRegion(
-                    onHover: (details) {
-                      //여기서 temp가 현재 마우스의 위치를 따라가도록 함
-                      setState(() {
-                        mouse = details.localPosition;
-                        temp?.pos = details.localPosition;
-                      });
-                    },
+                    cursor: mode == Mode.add
+                        ? SystemMouseCursors.precise
+                        : MouseCursor.defer,
                     child: Container(
                       color: Color(0xFFF3F0E9),
                       width: double.maxFinite,
                       height: double.maxFinite,
                       child: Stack(
                         children: [
-                          ...nodes.map((star) => node(context, star)),
-                          if (temp != null) emptyNode(temp!, areaSize),
-                          if (original != null) original!, // `original` 위젯 추가
+                          ...nodes.map((star) => _buildNode(context, star)),
+                          if (origin != null)
+                            _buildOriginNode(origin!), // `origin` 위젯 추가
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              blackhole(),
+              _buildBlackhole(),
             ],
           ),
         ),
@@ -100,7 +98,7 @@ class _StellarViewState extends State<StellarView> {
       floatingActionButton: GestureDetector(
         onTapUp: (details) {
           setState(() {
-            temp = Node(details.globalPosition, showArea: true);
+            mode = Mode.add;
           });
         },
         child: Container(
@@ -119,7 +117,7 @@ class _StellarViewState extends State<StellarView> {
     );
   }
 
-  Widget node(BuildContext context, Node node) {
+  Widget _buildNode(BuildContext context, Node node) {
     if (node.isDeleting) {
       return TweenAnimationBuilder(
         tween: Tween(
@@ -140,7 +138,10 @@ class _StellarViewState extends State<StellarView> {
             height: areaSize,
             child: Stack(
               alignment: Alignment.center,
-              children: [starArea(node), star()],
+              children: [
+                _buildArea(node),
+                _buildStar(),
+              ],
             ),
           ),
         ),
@@ -151,13 +152,39 @@ class _StellarViewState extends State<StellarView> {
       top: node.pos.dy - orbitSize / 2,
       child: GestureDetector(
         onPanUpdate: (details) {
-          //원래자리에 노드 모양 위젯 생성
-          original ??= emptyNode(Node(node.pos, showArea: true), starSize);
-
           setState(() {
-            for (final node in nodes) {
-              node.showOrbit = true;
+            //원래자리에 노드 모양 위젯 생성
+            origin ??= Node(
+              node.pos,
+            )..planetAnimation = AnimationController(
+                vsync: this,
+                upperBound: 2 * pi,
+                duration: Duration(seconds: 10),
+              );
+
+            void updateOrbit(Node? other) {
+              if (other == node || other == null) return;
+              if ((other.pos - node.pos).distanceSquared <=
+                  orbitSize * orbitSize / 4) {
+                other.showOrbit = true;
+                if (!other.planetAnimation.isAnimating) {
+                  other.planetAnimation.repeat();
+                }
+              } else {
+                other.showOrbit = false;
+                if (other.planetAnimation.isAnimating) {
+                  other.planetAnimation.reset();
+                }
+              }
             }
+
+            for (final other in nodes) {
+              updateOrbit(other);
+            }
+            if (mode == Mode.add) {
+              updateOrbit(origin);
+            }
+
             node.pos += details.delta;
           });
         },
@@ -167,7 +194,7 @@ class _StellarViewState extends State<StellarView> {
               node.showOrbit = false;
             }
 
-            original = null; // `original`을 `null`로 설정
+            origin = null; // `origin`을 `null`로 설정
 
             if (blackholeEnabled) {
               node.isDeleting = true;
@@ -179,44 +206,83 @@ class _StellarViewState extends State<StellarView> {
           height: orbitSize,
           child: Stack(
             alignment: Alignment.center,
-            children: [orbit(node), starArea(node), star()],
+            children: [
+              _buildOrbit(node),
+              _buildArea(node),
+              _buildStar(),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget emptyNode(Node node, double size) {
+  Widget _buildOriginNode(Node node) {
     return Positioned(
-      left: node.pos.dx - size / 2,
-      top: node.pos.dy - size / 2,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Color(0xFFE5C33E).withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        width: size,
-        height: size,
-      ),
-    );
-  }
-
-  Widget orbit(Node star) {
-    return Visibility(
-      visible: star.showOrbit,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Color(0xFFE5C33E).withOpacity(0.1),
-          border: Border.all(color: Color(0xFFE5C33E)),
-          shape: BoxShape.circle,
-        ),
+      left: node.pos.dx - orbitSize / 2,
+      top: node.pos.dy - orbitSize / 2,
+      child: SizedBox(
         width: orbitSize,
         height: orbitSize,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            _buildOrbit(node),
+            Opacity(
+              opacity: 0.2,
+              child: _buildStar(),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget starArea(Node star) {
+  Widget _buildOrbit(Node star) {
+    return Visibility(
+      visible: star.showOrbit,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Color(0xFFE5C33E).withOpacity(0.05),
+              border: Border.all(color: Color(0xFFE5C33E)),
+              shape: BoxShape.circle,
+            ),
+            width: orbitSize,
+            height: orbitSize,
+          ),
+          /*TweenAnimationBuilder(
+            tween: Tween(
+              begin: 0,
+              end: 2 * pi,
+            ),
+            duration: Duration(seconds: 10),
+            builder: (_, val, __) => Positioned(
+              left: (orbitSize * (cos(val) + 1) - planetSize) / 2,
+              top: (orbitSize * (sin(val) + 1) - planetSize) / 2,
+              child: _buildPlanet(),
+            ),*/
+          AnimatedBuilder(
+            animation: star.planetAnimation,
+            builder: (_, __) => Positioned(
+              left: (orbitSize * (cos(star.planetAnimation.value) + 1) -
+                      planetSize) /
+                  2,
+              top: (orbitSize * (sin(star.planetAnimation.value) + 1) -
+                      planetSize) /
+                  2,
+              child: _buildPlanet(),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArea(Node star) {
     return Visibility(
       visible: star.showArea,
       child: Container(
@@ -230,7 +296,7 @@ class _StellarViewState extends State<StellarView> {
     );
   }
 
-  Widget star() {
+  Widget _buildStar() {
     return Container(
       decoration: BoxDecoration(
         color: Color(0xFFE5C33E),
@@ -241,7 +307,18 @@ class _StellarViewState extends State<StellarView> {
     );
   }
 
-  Widget blackhole() {
+  Widget _buildPlanet() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Color(0xFFE5C33E),
+        shape: BoxShape.circle,
+      ),
+      width: planetSize,
+      height: planetSize,
+    );
+  }
+
+  Widget _buildBlackhole() {
     return Positioned(
       left: -blackholeAreaSize / 2,
       bottom: -blackholeAreaSize / 2,
@@ -277,9 +354,9 @@ class _StellarViewState extends State<StellarView> {
 
 class EdgePainter extends CustomPainter {
   final List<Edge> edges;
-  final Edge? temp;
+  final Edge? addMark;
 
-  EdgePainter(this.edges, {this.temp});
+  EdgePainter(this.edges, {this.addMark});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -295,7 +372,7 @@ class EdgePainter extends CustomPainter {
     for (final edge in edges) {
       drawLine(edge);
     }
-    if (temp != null) drawLine(temp!);
+    if (addMark != null) drawLine(addMark!);
   }
 
   @override
