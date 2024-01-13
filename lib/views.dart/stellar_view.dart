@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:week3/const/size.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/models/node.dart';
+import 'package:week3/models/edge.dart';
 
 class StellarView extends StatefulWidget {
   const StellarView({super.key});
@@ -15,8 +16,9 @@ class StellarView extends StatefulWidget {
 
 class _StellarViewState extends State<StellarView> {
   List<Node> nodes = [];
+  List<Edge> edges = [];
   Node? temp;
-  Node? original;
+  Widget? original;
   Mode mode = Mode.none;
   double scale = 1.0;
   Offset mouse = Offset.zero;
@@ -82,7 +84,8 @@ class _StellarViewState extends State<StellarView> {
                       child: Stack(
                         children: [
                           ...nodes.map((star) => node(context, star)),
-                          if (temp != null) emptyNode(temp!),
+                          if (temp != null) emptyNode(temp!, areaSize),
+                          if (original != null) original!, // `original` 위젯 추가
                         ],
                       ),
                     ),
@@ -148,11 +151,8 @@ class _StellarViewState extends State<StellarView> {
       top: node.pos.dy - orbitSize / 2,
       child: GestureDetector(
         onPanUpdate: (details) {
-          if (original == null) {
-            // 클릭한 별의 원래 자리에 투명한 노드를 추가
-            original = Node(node.pos);
-            nodes.add(original!);
-          }
+          //원래자리에 노드 모양 위젯 생성
+          original ??= emptyNode(Node(node.pos, showArea: true), starSize);
 
           setState(() {
             for (final node in nodes) {
@@ -166,11 +166,9 @@ class _StellarViewState extends State<StellarView> {
             for (final node in nodes) {
               node.showOrbit = false;
             }
-            if (original != null) {
-              // 클릭한 별의 원래 자리에 추가한 투명한 노드를 삭제
-              nodes.remove(original);
-              original = null;
-            }
+
+            original = null; // `original`을 `null`로 설정
+
             if (blackholeEnabled) {
               node.isDeleting = true;
             }
@@ -188,11 +186,18 @@ class _StellarViewState extends State<StellarView> {
     );
   }
 
-  Widget emptyNode(Node node) {
+  Widget emptyNode(Node node, double size) {
     return Positioned(
-      left: node.pos.dx - areaSize / 2,
-      top: node.pos.dy - areaSize / 2,
-      child: starArea(node),
+      left: node.pos.dx - size / 2,
+      top: node.pos.dy - size / 2,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Color(0xFFE5C33E).withOpacity(0.2),
+          shape: BoxShape.circle,
+        ),
+        width: size,
+        height: size,
+      ),
     );
   }
 
@@ -268,4 +273,31 @@ class _StellarViewState extends State<StellarView> {
       ),
     );
   }
+}
+
+class EdgePainter extends CustomPainter {
+  final List<Edge> edges;
+  final Edge? temp;
+
+  EdgePainter(this.edges, {this.temp});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    void drawLine(Edge edge) {
+      final p1 = edge.node1.pos;
+      final p2 = edge.node2.pos;
+      final paint = Paint()
+        ..color = Colors.white
+        ..strokeWidth = 1;
+      canvas.drawLine(p1, p2, paint);
+    }
+
+    for (final edge in edges) {
+      drawLine(edge);
+    }
+    if (temp != null) drawLine(temp!);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
