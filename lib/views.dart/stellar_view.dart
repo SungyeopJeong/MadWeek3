@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:week3/const/size.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/models/node.dart';
 
@@ -37,7 +38,7 @@ class _StellarViewState extends State<StellarView> {
         bindings: <ShortcutActivator, VoidCallback>{
           const SingleActivator(LogicalKeyboardKey.keyI): () {
             setState(() {
-              temp = Node(mouse, hover: true); //현재 마우스 위치에 따라 움직일 temp Node 생성
+              temp = Node(mouse, showArea: true);
             });
           }
         },
@@ -96,7 +97,7 @@ class _StellarViewState extends State<StellarView> {
       floatingActionButton: GestureDetector(
         onTapUp: (details) {
           setState(() {
-            temp = Node(details.globalPosition, hover: true);
+            temp = Node(details.globalPosition, showArea: true);
           });
         },
         child: Container(
@@ -123,23 +124,28 @@ class _StellarViewState extends State<StellarView> {
           end: Offset(0, MediaQuery.of(context).size.height),
         ),
         duration: Duration(milliseconds: 250),
+        onEnd: () {
+          setState(() {
+            nodes.remove(node);
+          });
+        },
         builder: (_, val, __) => Positioned(
-          left: val.dx - 36 / 2,
-          top: val.dy - 36 / 2,
+          left: val.dx - areaSize / 2,
+          top: val.dy - areaSize / 2,
           child: SizedBox(
-            width: 36,
-            height: 36,
+            width: areaSize,
+            height: areaSize,
             child: Stack(
               alignment: Alignment.center,
-              children: [starArea(node), star(node)],
+              children: [starArea(node), star()],
             ),
           ),
         ),
       );
     }
     return Positioned(
-      left: node.pos.dx - 36 / 2,
-      top: node.pos.dy - 36 / 2,
+      left: node.pos.dx - orbitSize / 2,
+      top: node.pos.dy - orbitSize / 2,
       child: GestureDetector(
         onPanUpdate: (details) {
           if (original == null) {
@@ -149,29 +155,33 @@ class _StellarViewState extends State<StellarView> {
           }
 
           setState(() {
+            for (final node in nodes) {
+              node.showOrbit = true;
+            }
             node.pos += details.delta;
           });
         },
         onPanEnd: (details) {
-          if (original != null) {
-            // 클릭한 별의 원래 자리에 추가한 투명한 노드를 삭제
-            setState(() {
+          setState(() {
+            for (final node in nodes) {
+              node.showOrbit = false;
+            }
+            if (original != null) {
+              // 클릭한 별의 원래 자리에 추가한 투명한 노드를 삭제
               nodes.remove(original);
               original = null;
-            });
-          }
-          if (blackholeEnabled) {
-            setState(() {
+            }
+            if (blackholeEnabled) {
               node.isDeleting = true;
-            });
-          }
+            }
+          });
         },
         child: SizedBox(
-          width: 36,
-          height: 36,
+          width: orbitSize,
+          height: orbitSize,
           child: Stack(
             alignment: Alignment.center,
-            children: [starArea(node), star(node)],
+            children: [orbit(node), starArea(node), star()],
           ),
         ),
       ),
@@ -180,41 +190,56 @@ class _StellarViewState extends State<StellarView> {
 
   Widget emptyNode(Node node) {
     return Positioned(
-      left: node.pos.dx - 36 / 2,
-      top: node.pos.dy - 36 / 2,
+      left: node.pos.dx - areaSize / 2,
+      top: node.pos.dy - areaSize / 2,
       child: starArea(node),
+    );
+  }
+
+  Widget orbit(Node star) {
+    return Visibility(
+      visible: star.showOrbit,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Color(0xFFE5C33E).withOpacity(0.1),
+          border: Border.all(color: Color(0xFFE5C33E)),
+          shape: BoxShape.circle,
+        ),
+        width: orbitSize,
+        height: orbitSize,
+      ),
     );
   }
 
   Widget starArea(Node star) {
     return Visibility(
-      visible: star.hover,
+      visible: star.showArea,
       child: Container(
         decoration: BoxDecoration(
           color: Color(0xFFE5C33E).withOpacity(0.2),
           shape: BoxShape.circle,
         ),
-        width: 36,
-        height: 36,
+        width: areaSize,
+        height: areaSize,
       ),
     );
   }
 
-  Widget star(Node star) {
+  Widget star() {
     return Container(
       decoration: BoxDecoration(
         color: Color(0xFFE5C33E),
         shape: BoxShape.circle,
       ),
-      width: 18,
-      height: 18,
+      width: starSize,
+      height: starSize,
     );
   }
 
   Widget blackhole() {
     return Positioned(
-      left: -100,
-      bottom: -100,
+      left: -blackholeAreaSize / 2,
+      bottom: -blackholeAreaSize / 2,
       child: MouseRegion(
         onEnter: (_) {
           setState(() {
@@ -227,8 +252,8 @@ class _StellarViewState extends State<StellarView> {
           });
         },
         child: Container(
-          width: 200,
-          height: 200,
+          width: blackholeAreaSize,
+          height: blackholeAreaSize,
           alignment: Alignment.center,
           child: AnimatedContainer(
             duration: Duration(milliseconds: 100),
@@ -236,8 +261,8 @@ class _StellarViewState extends State<StellarView> {
               color: Colors.black,
               shape: BoxShape.circle,
             ),
-            width: blackholeEnabled ? 160 : 120,
-            height: blackholeEnabled ? 160 : 120,
+            width: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
+            height: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
           ),
         ),
       ),

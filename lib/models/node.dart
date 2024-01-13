@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 
 class Node {
   Offset pos;
-  bool hover, isDeleting;
+  bool showArea, showOrbit, isDeleting;
 
   Node(
     this.pos, {
-    this.hover = false,
+    this.showArea = false,
+    this.showOrbit = false,
     this.isDeleting = false,
   });
 
   factory Node.from(Node node) {
-    return Node(node.pos, hover: node.hover, isDeleting: node.isDeleting);
+    return Node(
+      node.pos,
+      showArea: node.showArea,
+      showOrbit: node.showOrbit,
+      isDeleting: node.isDeleting,
+    );
   }
 
   @override
@@ -21,5 +27,5 @@ class Node {
   }
 
   @override
-  int get hashCode => Object.hash(hover, pos);
+  int get hashCode => Object.hash(pos, showArea, showOrbit, isDeleting);
 }
