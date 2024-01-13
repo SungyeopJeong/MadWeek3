@@ -15,6 +15,7 @@ class StellarView extends StatefulWidget {
 class _StellarViewState extends State<StellarView> {
   List<Node> nodes = [];
   Node? temp;
+  Node? original;
   Mode mode = Mode.none;
   double scale = 1.0;
   Offset mouse = Offset.zero;
@@ -141,11 +142,24 @@ class _StellarViewState extends State<StellarView> {
       top: node.pos.dy - 36 / 2,
       child: GestureDetector(
         onPanUpdate: (details) {
+          if (original == null) {
+            // 클릭한 별의 원래 자리에 투명한 노드를 추가
+            original = Node(node.pos);
+            nodes.add(original!);
+          }
+
           setState(() {
             node.pos += details.delta;
           });
         },
         onPanEnd: (details) {
+          if (original != null) {
+            // 클릭한 별의 원래 자리에 추가한 투명한 노드를 삭제
+            setState(() {
+              nodes.remove(original);
+              original = null;
+            });
+          }
           if (blackholeEnabled) {
             setState(() {
               node.isDeleting = true;
