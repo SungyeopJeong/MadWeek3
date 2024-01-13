@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class Node {
   Offset pos;
   bool showArea, showOrbit, isDeleting;
+  late AnimationController planetAnimation;
 
   Node(
     this.pos, {
