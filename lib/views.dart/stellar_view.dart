@@ -4,10 +4,12 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart'; // Markdown 패키지 임포트
 import 'package:week3/const/size.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
+import 'package:week3/models/post.dart';
 
 class StellarView extends StatefulWidget {
   const StellarView({super.key});
@@ -23,6 +25,13 @@ class _StellarViewState extends State<StellarView>
   Node? origin;
   Mode mode = Mode.none;
   bool blackholeEnabled = false;
+  bool get isStarSelected => selectedNode != null; // 별이 선택되었는지 여부를 추적하는 변수
+  Node? selectedNode; // 선택된 노드 추적
+
+  //텍스트 수정을 위한 선언
+  bool isEditing = false;
+  TextEditingController titleController = TextEditingController();
+  TextEditingController contentController = TextEditingController();
 
   bool isIn(Offset leftTop, Offset rightBottom, Offset target, bool isCircle) {
     if (isCircle) {
@@ -36,64 +45,71 @@ class _StellarViewState extends State<StellarView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyI): () {
-            setState(() {
-              mode = Mode.add;
-            });
-          }
-        },
-        child: Focus(
-          autofocus: true,
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                child: GestureDetector(
-                  onTapDown: (details) {
-                    if (mode == Mode.add) {
-                      setState(() {
-                        nodes.add(
-                          Node(details.localPosition)
-                            ..planetAnimation = AnimationController(
-                              vsync: this,
-                              upperBound: 2 * pi,
-                              duration: Duration(seconds: 10),
-                            ),
-                        );
-                        mode = Mode.none;
-                      });
-                    }
-                  },
-                  onSecondaryTap: () {
-                    // 마우스 오른쪽 클릭 이벤트 처리
-                    setState(() {
-                      mode = Mode.none; // 별 생성 모드 취소
-                    });
-                  },
-                  child: MouseRegion(
-                    cursor: mode == Mode.add
-                        ? SystemMouseCursors.precise
-                        : MouseCursor.defer,
-                    child: Container(
-                      color: Color(0xFFF3F0E9),
-                      width: double.maxFinite,
-                      height: double.maxFinite,
-                      child: Stack(
-                        children: [
-                          ...nodes.map((star) => _buildNode(context, star)),
-                          if (origin != null)
-                            _buildOriginNode(origin!), // `origin` 위젯 추가
-                        ],
+      body: Stack(
+        children: [
+          CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.keyI): () {
+                setState(() {
+                  mode = Mode.add;
+                });
+              }
+            },
+            child: Focus(
+              autofocus: true,
+              child: Stack(
+                children: [
+                  InteractiveViewer(
+                    child: GestureDetector(
+                      onTapDown: (details) {
+                        if (mode == Mode.add) {
+                          setState(() {
+                            Node newNode = _createNode(
+                              details.localPosition,
+                              id: nodes
+                                  .length, // 'id' is based on the length of 'nodes' list
+                            )..post = Post(
+                                title: "Title Here",
+                                markdownContent:
+                                    "Context Here"); // Create an associated empty Post
+
+                            nodes.add(newNode);
+                            mode = Mode.none;
+                          });
+                        }
+                      },
+                      onSecondaryTap: () {
+                        // 마우스 오른쪽 클릭 이벤트 처리
+                        setState(() {
+                          mode = Mode.none; // 별 생성 모드 취소
+                        });
+                      },
+                      child: MouseRegion(
+                        cursor: mode == Mode.add
+                            ? SystemMouseCursors.precise
+                            : MouseCursor.defer,
+                        child: Container(
+                          color: Color(0xFFF3F0E9),
+                          width: double.maxFinite,
+                          height: double.maxFinite,
+                          child: Stack(
+                            children: [
+                              ...nodes.map((star) => _buildNode(context, star)),
+                              if (origin != null)
+                                _buildOriginNode(origin!), // `origin` 위젯 추가
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  _buildBlackhole(),
+                ],
               ),
-              _buildBlackhole(),
-            ],
+            ),
           ),
-        ),
+          _buildTextView(), // 여기에 넣고 싶음.
+        ],
       ),
       floatingActionButton: GestureDetector(
         onTapUp: (details) {
@@ -115,6 +131,17 @@ class _StellarViewState extends State<StellarView>
         ),
       ),
     );
+  }
+
+  Node _createNode(Offset position, {int id = -1}) {
+    return Node(
+      position,
+      //d: id,
+    )..planetAnimation = AnimationController(
+        vsync: this,
+        upperBound: 2 * pi,
+        duration: Duration(seconds: 10),
+      );
   }
 
   Widget _buildNode(BuildContext context, Node node) {
@@ -151,16 +178,23 @@ class _StellarViewState extends State<StellarView>
       left: node.pos.dx - orbitSize / 2,
       top: node.pos.dy - orbitSize / 2,
       child: GestureDetector(
+        onTap: () {
+          setState(() {
+            if (selectedNode != node) {
+              // 새로운 노드를 선택한 경우, 이전 선택된 노드의 orbit을 해제
+              if (selectedNode != null) {
+                selectedNode!.showOrbit = false;
+                selectedNode!.planetAnimation.reset();
+              }
+              selectedNode = node;
+              selectedNode!.showOrbit = true;
+              selectedNode!.planetAnimation.repeat();
+            }
+          });
+        },
         onPanUpdate: (details) {
           setState(() {
-            //원래자리에 노드 모양 위젯 생성
-            origin ??= Node(
-              node.pos,
-            )..planetAnimation = AnimationController(
-                vsync: this,
-                upperBound: 2 * pi,
-                duration: Duration(seconds: 10),
-              );
+            origin ??= _createNode(node.pos, id: -1);
 
             void updateOrbit(Node? other) {
               if (other == node || other == null) return;
@@ -346,6 +380,109 @@ class _StellarViewState extends State<StellarView>
             width: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
             height: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
           ),
+        ),
+      ),
+    );
+  }
+
+  /*
+    선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
+  */
+  Widget _buildTextView() {
+    if (!isStarSelected) {
+      return SizedBox
+          .shrink(); // If no star is selected, return an empty widget.
+    }
+
+    return Positioned(
+      top: 32,
+      right: 32,
+      bottom: 32,
+      child: Container(
+        width: 400, // 창의 너비를 400으로 고정
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      isEditing = false; // 화면을 닫으면 편집모드 종료
+                      selectedNode!.showOrbit = false;
+                      selectedNode = null;
+                    });
+                  },
+                ),
+                if (isEditing)
+                  IconButton(
+                    icon: Icon(Icons.visibility),
+                    onPressed: () {
+                      setState(() {
+                        selectedNode!.post.title = titleController.text;
+                        selectedNode!.post.markdownContent =
+                            contentController.text;
+                        isEditing = false;
+                      });
+                    },
+                  ),
+                if (!isEditing)
+                  IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () {
+                      setState(() {
+                        titleController.text = selectedNode!.post.title;
+                        contentController.text =
+                            selectedNode!.post.markdownContent;
+                        isEditing = true;
+                      });
+                    },
+                  ),
+              ],
+            ),
+            if (!isEditing)
+              Text(selectedNode!.post.title,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            if (isEditing)
+              TextField(
+                controller: titleController,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                decoration: InputDecoration(
+                  hintText: 'Enter title',
+                  border: InputBorder.none,
+                ),
+              ),
+            SizedBox(
+                height: 16), // For some spacing between the title and content
+            Expanded(
+              child: isEditing
+                  ? TextField(
+                      controller: contentController,
+                      style: TextStyle(fontSize: 16),
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: 'Enter content',
+                        border: InputBorder.none,
+                      ),
+                    )
+                  : MarkdownBody(
+                      data: selectedNode!.post.markdownContent,
+                    ),
+            ),
+          ],
         ),
       ),
     );

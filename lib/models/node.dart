@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:week3/models/post.dart';
 
 class Node {
   Offset pos;
   bool showArea, showOrbit, isDeleting;
+  //int id; // ID를 정수로 선언
+  late Post post;
   late AnimationController planetAnimation;
 
   Node(
@@ -10,6 +13,7 @@ class Node {
     this.showArea = false,
     this.showOrbit = false,
     this.isDeleting = false,
+    //required this.id,
   });
 
   factory Node.from(Node node) {
@@ -18,6 +22,7 @@ class Node {
       showArea: node.showArea,
       showOrbit: node.showOrbit,
       isDeleting: node.isDeleting,
+      //id: node.id,
     );
   }
 
