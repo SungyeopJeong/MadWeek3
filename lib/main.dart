@@ -32,75 +32,75 @@ class _MainAppState extends State<MainApp> {
     );
   }
 
-  Widget star(Node star) {
-    return Positioned(
-      left: star.pos.dx - 20 / 2,
-      top: star.pos.dy - 20 / 2,
-      child: MouseRegion(
-        onEnter: (_) {
-          setState(() {
-            star.hover = true;
-          });
-        },
-        onExit: (_) {
-          setState(() {
-            star.hover = false;
-          });
-        },
-        child: GestureDetector(
-          onPanUpdate: (details) {
-            setState(() {
-              star.pos += details.delta;
-            });
-          },
-          onTap: () {
-            if (tempNode != null) {
-              setState(() {
-                final edge = Edge(tempNode!, star);
-                if (!edges.contains(edge)) {
-                  edges.add(edge);
-                }
-                tempNode = null;
-                tempEdge = null;
-              });
-            } else {
-              setState(() {
-                tempNode = star;
-              });
-            }
-          },
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Visibility(
-                  visible: star.hover,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget star(Node star) {
+  //   return Positioned(
+  //     left: star.pos.dx - 20 / 2,
+  //     top: star.pos.dy - 20 / 2,
+  //     child: MouseRegion(
+  //       onEnter: (_) {
+  //         setState(() {
+  //           star.hover = true;
+  //         });
+  //       },
+  //       onExit: (_) {
+  //         setState(() {
+  //           star.hover = false;
+  //         });
+  //       },
+  //       child: GestureDetector(
+  //         onPanUpdate: (details) {
+  //           setState(() {
+  //             star.pos += details.delta;
+  //           });
+  //         },
+  //         onTap: () {
+  //           if (tempNode != null) {
+  //             setState(() {
+  //               final edge = Edge(tempNode!, star);
+  //               if (!edges.contains(edge)) {
+  //                 edges.add(edge);
+  //               }
+  //               tempNode = null;
+  //               tempEdge = null;
+  //             });
+  //           } else {
+  //             setState(() {
+  //               tempNode = star;
+  //             });
+  //           }
+  //         },
+  //         child: SizedBox(
+  //           width: 20,
+  //           height: 20,
+  //           child: Stack(
+  //             alignment: Alignment.center,
+  //             children: [
+  //               Visibility(
+  //                 visible: star.hover,
+  //                 child: Container(
+  //                   width: 20,
+  //                   height: 20,
+  //                   decoration: BoxDecoration(
+  //                     color: Colors.white.withOpacity(0.5),
+  //                     shape: BoxShape.circle,
+  //                   ),
+  //                 ),
+  //               ),
+  //               Container(
+  //                 width: 5,
+  //                 height: 5,
+  //                 decoration: const BoxDecoration(
+  //                   color: Colors.white,
+  //                   shape: BoxShape.circle,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 }
 
 class EdgePainter extends CustomPainter {
