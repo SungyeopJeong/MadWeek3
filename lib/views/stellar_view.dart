@@ -1,3 +1,621 @@
+// ignore_for_file: prefer_const_constructors
+
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:week3/const/color.dart';
+import 'package:week3/const/size.dart';
+import 'package:week3/enums/mode.dart';
+import 'package:week3/extensions/offset.dart';
+import 'package:week3/models/graph.dart';
+import 'package:week3/models/node.dart';
+import 'package:week3/models/edge.dart';
+
+class StellarView extends StatefulWidget {
+  const StellarView({super.key});
+
+  @override
+  State<StellarView> createState() => _StellarViewState();
+}
+
+class _StellarViewState extends State<StellarView>
+    with TickerProviderStateMixin {
+  Graph graph = Graph();
+  Node? origin;
+  Planet? tempPlanet;
+  Edge? originEdge;
+  Mode mode = Mode.none;
+  bool isBlackholeEnabled = false;
+  bool isEditing = false;
+  final _exception = Exception('Unable to classify');
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.keyI): () {
+            setState(() {
+              mode = Mode.add;
+            });
+          }
+        },
+        child: Focus(
+          autofocus: true,
+          child: Stack(
+            children: [
+              InteractiveViewer(child: _buildBody()),
+              _buildBlackhole(),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: _buildFAB(),
+    );
+  }
+
+  Widget _buildBody() {
+    return GestureDetector(
+      onTapDown: (details) {
+        if (mode == Mode.add) {
+          setState(() {
+            graph.addNode(
+              Star(pos: details.localPosition)
+                ..planets = []
+                ..planetAnimation = AnimationController(vsync: this),
+            );
+            mode = Mode.none;
+          });
+        }
+      },
+      onSecondaryTap: () {
+        // 마우스 오른쪽 클릭 이벤트 처리
+        setState(() {
+          mode = Mode.none; // 별 생성 모드 취소
+        });
+      },
+      child: MouseRegion(
+        cursor:
+            mode == Mode.add ? SystemMouseCursors.precise : MouseCursor.defer,
+        child: Container(
+          color: MyColor.bg,
+          width: double.maxFinite,
+          height: double.maxFinite,
+          child: Stack(
+            children: [
+              CustomPaint(
+                size: Size(double.maxFinite, double.maxFinite),
+                painter: EdgePainter(
+                  graph.edges,
+                  originEdge: originEdge,
+                ),
+              ),
+              ..._buildNodes(graph.nodes),
+              if (origin != null) _buildOrigin(origin!),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFAB() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          mode = Mode.add;
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: MyColor.surface,
+          shape: BoxShape.circle,
+        ),
+        width: 60,
+        height: 60,
+        child: Icon(
+          Icons.insights,
+          color: MyColor.onSurface,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildNodes(List<Node> nodes) {
+    return nodes.skipWhile((node) => node is Planet).map((node) {
+      switch (node) {
+        case Star():
+          return _buildStar(node);
+        case Constellation():
+          return _buildConstellation(node);
+        default:
+          throw _exception;
+      }
+    }).toList();
+  }
+
+  Widget _buildDeletingNode(Node node, Widget Function(Offset) childBuilder) {
+    return TweenAnimationBuilder(
+      tween: Tween(
+        begin: node.pos,
+        end: Offset(0, MediaQuery.of(context).size.height),
+      ),
+      duration: Duration(milliseconds: 250),
+      onEnd: () {
+        setState(() {
+          graph.removeNode(node);
+        });
+      },
+      builder: (_, val, __) => childBuilder(val),
+    );
+  }
+
+  Widget _buildHelper(double size, List<Widget> children) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildColoredCircle(
+    double size,
+    Color color, {
+    BoxBorder? border,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        border: border,
+        shape: BoxShape.circle,
+      ),
+      width: size,
+      height: size,
+    );
+  }
+
+  Widget _buildPlanetCenter(Planet planet) {
+    return Visibility(
+      visible: planet.showPlanet,
+      child: _buildColoredCircle(
+        planetSize,
+        planet == tempPlanet ? MyColor.star : MyColor.planet,
+      ),
+    );
+  }
+
+  Widget _buildPlanetArea(Planet planet) {
+    return Visibility(
+      visible: planet.showArea,
+      child: _buildColoredCircle(
+        planetAreaSize,
+        planet == tempPlanet ? MyColor.starArea : MyColor.planetArea,
+      ),
+    );
+  }
+
+  Widget _buildEmptyPlanet(Planet planet) {
+    return _buildHelper(
+      planetAreaSize,
+      [
+        _buildPlanetArea(planet),
+        _buildPlanetCenter(planet),
+      ],
+    );
+  }
+
+  Widget _buildPlanet(Planet planet) {
+    if (planet.isDeleting) {
+      return _buildDeletingNode(
+        planet,
+        (val) => Positioned(
+          left: val.dx - planetSize / 2,
+          top: val.dy - planetSize / 2,
+          child: _buildPlanetCenter(planet),
+        ),
+      );
+    }
+    return MouseRegion(
+      onEnter: (_) {
+        if (!isEditing) {
+          setState(() {
+            planet.showArea = true;
+          });
+        }
+      },
+      onExit: (_) {
+        if (!isEditing) {
+          setState(() {
+            planet.showArea = false;
+          });
+        }
+      },
+      child: _buildEmptyPlanet(planet),
+    );
+  }
+
+  Widget _buildStarCenter(Star star) {
+    return Visibility(
+      visible: star.showStar,
+      child: _buildColoredCircle(
+        starSize,
+        MyColor.star.withOpacity(star == origin ? 0.2 : 1),
+      ),
+    );
+  }
+
+  Widget _buildStarArea(Star star) {
+    return Visibility(
+      visible: star.showOrbit ? true : star.showArea,
+      child: _buildColoredCircle(starAreaSize, MyColor.starArea),
+    );
+  }
+
+  Widget _buildStarOrbit(Star star) {
+    return Visibility(
+      visible: star.showOrbit,
+      child: _buildHelper(
+        starTotalSize,
+        [
+          _buildColoredCircle(
+            starOrbitSize,
+            MyColor.starOrbit,
+            border: Border.all(color: MyColor.star),
+          ),
+          AnimatedBuilder(
+            animation: star.planetAnimation,
+            builder: (_, __) {
+              final alpha = star.planetAnimation.value * 2 * pi;
+              const radius = starOrbitSize / 2;
+              for (final planetWithIndex in star.planets.indexed) {
+                final index = planetWithIndex.$1;
+                final planet = planetWithIndex.$2;
+                final angle = index * 2 * pi / star.planets.length + alpha;
+                final x = radius * cos(angle);
+                final y = radius * sin(angle);
+                planet.pos = star.pos + Offset(x, y);
+              }
+              return Stack(
+                children: star.planets
+                    .map(
+                      (planet) => Positioned(
+                        left: starTotalSize / 2 +
+                            planet.pos.dx -
+                            star.pos.dx -
+                            planetAreaSize / 2,
+                        top: starTotalSize / 2 +
+                            planet.pos.dy -
+                            star.pos.dy -
+                            planetAreaSize / 2,
+                        child: _buildPlanet(planet),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyStar(Star star) {
+    return _buildHelper(
+      starTotalSize,
+      [
+        _buildStarOrbit(star),
+        _buildStarArea(star),
+        _buildStarCenter(star),
+      ],
+    );
+  }
+
+  void _setOnPanStart(Node node) {
+    isEditing = true;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        origin = Star(pos: node.pos)
+          ..id = 0
+          ..planets = []
+          ..planetAnimation = AnimationController(vsync: this);
+        originEdge = Edge(origin!, node);
+      default:
+        throw _exception;
+    }
+  }
+
+  void _setOnPanEnd(Node node) {
+    isEditing = false;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            (other as Star).showOrbit = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              other.addPlanet(Planet(star: other));
+              tempPlanet = null;
+            }
+            if (other.planetAnimation.isAnimating) {
+              other.planetAnimation.reset();
+            }
+            break;
+          }
+        }
+
+        originEdge = null;
+        origin = null;
+      default:
+        throw _exception;
+    }
+  }
+
+  void _caseProcess(Node node) {
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            (other as Star).showOrbit = true;
+            if (tempPlanet == null) {
+              tempPlanet = Planet(star: other, showArea: true)..id = 0;
+              other.planets.add(tempPlanet!);
+              originEdge!.end = tempPlanet!;
+            }
+            if (!other.planetAnimation.isAnimating) {
+              other.planetAnimation.repeat(period: Duration(seconds: 10));
+            }
+          } else {
+            (other as Star).showOrbit = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              tempPlanet = null;
+              originEdge!.end = node;
+            }
+            if (other.planetAnimation.isAnimating) {
+              other.planetAnimation.reset();
+            }
+          }
+        }
+      default:
+        throw _exception;
+    }
+  }
+
+  Widget _buildStar(Star star) {
+    if (star.isDeleting) {
+      return _buildDeletingNode(
+        star,
+        (val) => Positioned(
+          left: val.dx - starSize / 2,
+          top: val.dy - starSize / 2,
+          child: _buildStarCenter(star),
+        ),
+      );
+    }
+    return Positioned(
+      left: star.pos.dx - starTotalSize / 2,
+      top: star.pos.dy - starTotalSize / 2,
+      child: GestureDetector(
+        onPanStart: (details) {
+          setState(() {
+            _setOnPanStart(star);
+          });
+        },
+        onPanUpdate: (details) {
+          if (star.showArea) {
+            // star following cursor if area shown(interactive)
+            setState(() {
+              star.pos += details.delta;
+
+              _caseProcess(star);
+            });
+          }
+        },
+        onPanEnd: (_) {
+          setState(() {
+            _setOnPanEnd(star);
+            star.isDeleting = isBlackholeEnabled;
+          });
+        },
+        child: MouseRegion(
+          onHover: (details) {
+            setState(() {
+              // show area if mouse in area
+              star.showArea = details.localPosition.closeTo(
+                OffsetExt.center(starTotalSize),
+                starAreaSize,
+              );
+            });
+          },
+          child: _buildEmptyStar(star),
+        ),
+      ),
+    );
+    /*GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            //원래자리에 노드 모양 위젯 생성
+            origin ??= Node(node.pos)
+              ..planetAnimation = AnimationController(
+                vsync: this,
+                upperBound: 2 * pi,
+                duration: Duration(seconds: 10),
+              );
+            origin!.showStar = false;
+            originEdge = Edge(origin!, node);
+            node.showStar = true;
+
+            void updateState(Node? other) {
+              if (other == node || other == null) return;
+              final distanceSquared = (other.pos - node.pos).distanceSquared;
+              double radiusSquared(double diameter) => diameter * diameter / 4;
+              if (distanceSquared <= radiusSquared(areaSize)) {
+                final edge = Edge(origin!, other);
+                if (!edges.any((element) => element == edge)) {
+                  origin!.showStar = true;
+                  originEdge = edge;
+                  node.showStar = false;
+                }
+                return;
+              }
+              if (distanceSquared <= radiusSquared(orbitSize)) {
+                other.showOrbit = true;
+                if (!other.planetAnimation.isAnimating) {
+                  other.planetAnimation.repeat();
+                }
+              } else {
+                other.showOrbit = false;
+                if (other.planetAnimation.isAnimating) {
+                  other.planetAnimation.reset();
+                }
+              }
+            }
+
+            for (final other in nodes) {
+              updateState(other);
+            }
+            if (mode == Mode.add) {
+              updateState(origin);
+            }
+          });
+        },
+        onPanEnd: (details) {
+          setState(() {
+            for (final node in nodes) {
+              node.showOrbit = false;
+            }
+
+            if (origin?.showStar ?? false) {
+              node.pos = origin!.pos;
+              node.showStar = true;
+              originEdge!.node1 = node;
+              if (!edges.contains(originEdge)) {
+                edges.add(originEdge!);
+              }
+            }
+
+            origin = null; // `origin`을 `null`로 설정
+            originEdge = null;
+          });
+        },
+      )*/
+  }
+
+  Widget _buildOrigin(Node node) {
+    switch (node) {
+      case Planet():
+        return _buildEmptyPlanet(node);
+      case Star():
+        return Positioned(
+          left: node.pos.dx - starTotalSize / 2,
+          top: node.pos.dy - starTotalSize / 2,
+          child: _buildEmptyStar(node),
+        );
+      default:
+        throw _exception;
+    }
+  }
+
+  Widget _buildConstellation(Constellation constellation) {
+    return Placeholder();
+  }
+
+  Widget _buildBlackhole() {
+    final blackholeSize =
+        isBlackholeEnabled ? blackholeMaxSize : blackholeMinSize;
+    return Positioned(
+      left: -blackholeAreaSize / 2,
+      bottom: -blackholeAreaSize / 2,
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            isBlackholeEnabled = true;
+          });
+        },
+        onExit: (_) {
+          setState(() {
+            isBlackholeEnabled = false;
+          });
+        },
+        child: Container(
+          width: blackholeAreaSize,
+          height: blackholeAreaSize,
+          alignment: Alignment.center,
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 100),
+            decoration: BoxDecoration(
+              color: MyColor.blackhole,
+              shape: BoxShape.circle,
+            ),
+            width: blackholeSize,
+            height: blackholeSize,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EdgePainter extends CustomPainter {
+  final List<Edge> edges;
+  final Edge? originEdge;
+
+  EdgePainter(this.edges, {this.originEdge});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    void drawLine(Edge edge) {
+      final p1 = edge.start.pos;
+      final p2 = edge.end.pos;
+      final paint = Paint()
+        ..color = MyColor.line
+        ..strokeWidth = 1;
+      canvas.drawLine(p1, p2, paint);
+    }
+
+    void drawDashedLine(Edge edge) {
+      final p1 = edge.start.pos;
+      final p2 = edge.end.pos;
+      final paint = Paint()
+        ..color = MyColor.dashedLine
+        ..strokeWidth = 2;
+
+      final unit = (p2 - p1) / (p2 - p1).distance;
+      final dash = unit * 10;
+      final gap = unit * 8;
+
+      for (var p = p1;
+          (p + dash - p1).distanceSquared <= (p2 - p1).distanceSquared;
+          p += dash + gap) {
+        canvas.drawLine(p, p + dash, paint);
+      }
+    }
+
+    for (final edge in edges) {
+      drawLine(edge);
+    }
+    if (originEdge != null) drawDashedLine(originEdge!);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
+}
+/*
 // ignore_for_file: prefer_cR   onst_constructors
 
 import 'dart:math';
@@ -756,3 +1374,4 @@ class EdgePainter extends CustomPainter {
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
+*/

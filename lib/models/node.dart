@@ -2,33 +2,64 @@ import 'package:flutter/material.dart';
 import 'package:week3/models/post.dart';
 
 class Node {
+  late int id;
   Offset pos;
-  bool showArea, showOrbit, isDeleting;
   late Post post;
+
+  Node({
+    required this.pos,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! Node) return false;
+    return id == other.id;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, pos);
+}
+
+class Planet extends Node {
+  Star star;
+  bool showPlanet, showArea, isDeleting, isOrigin;
+
+  Planet({
+    super.pos = Offset.zero,
+    required this.star,
+    this.showPlanet = true,
+    this.showArea = false,
+    this.isDeleting = false,
+    this.isOrigin = false,
+  });
+}
+
+class Star extends Node {
+  Constellation? constellation;
+  late List<Planet> planets;
+  bool showStar, showArea, showOrbit, isDeleting;
   late AnimationController planetAnimation;
 
-  Node(
-    this.pos, {
+  int _newId = 1;
+
+  Star({
+    required super.pos,
+    this.constellation,
+    this.showStar = true,
     this.showArea = false,
     this.showOrbit = false,
     this.isDeleting = false,
   });
 
-  factory Node.from(Node node) {
-    return Node(
-      node.pos,
-      showArea: node.showArea,
-      showOrbit: node.showOrbit,
-      isDeleting: node.isDeleting,
-    );
+  void addPlanet(Planet planet) {
+    planets.add(planet..id = _newId++);
   }
+}
 
-  @override
-  bool operator ==(Object other) {
-    if (other is! Node) return false;
-    return pos == other.pos;
-  }
+class Constellation extends Node {
+  late List<Star> stars;
 
-  @override
-  int get hashCode => Object.hash(pos, showArea, showOrbit, isDeleting);
+  Constellation({
+    required super.pos,
+  });
 }
