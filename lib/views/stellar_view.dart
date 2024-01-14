@@ -108,7 +108,7 @@ class _StellarViewState extends State<StellarView>
               ),
             ),
           ),
-          _buildTextView(), // 여기에 넣고 싶음.
+          _buildNoteView(),
         ],
       ),
       floatingActionButton: GestureDetector(
@@ -388,145 +388,148 @@ class _StellarViewState extends State<StellarView>
   /*
     선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
   */
-  Widget _buildTextView() {
+  Widget _buildNoteView() {
     if (!isStarSelected) {
-      return SizedBox
-          .shrink(); // If no star is selected, return an empty widget.
+      return SizedBox.shrink();
     }
     return Positioned(
-        top: 32,
-        right: 32,
-        bottom: 32,
-        child: GestureDetector(
-          onTap: () {
-            // 텍스트 필드 외부를 클릭했을 때 편집 모드 종료
-            if (isEditing) {
-              setState(() {
-                selectedNode!.post.title = titleController.text;
-                selectedNode!.post.markdownContent = contentController.text;
-                isEditing = false;
-              });
-            }
-          },
-          behavior: HitTestBehavior.opaque, // 전체 영역이 클릭 가능하도록 설정
-          child: Container(
-            width: 400, // 창의 너비를 400으로 고정
-            padding: EdgeInsets.symmetric(
-                horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (isEditing)
-                      IconButton(
-                        icon: Icon(Icons.visibility),
-                        onPressed: () {
-                          setState(() {
-                            selectedNode!.post.title = titleController.text;
-                            selectedNode!.post.markdownContent =
-                                contentController.text;
-                            isEditing = false;
-                          });
-                        },
-                      ),
-                    if (!isEditing)
-                      IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () {
-                          setState(() {
-                            titleController.text = selectedNode!.post.title;
-                            contentController.text =
-                                selectedNode!.post.markdownContent;
-                            isEditing = true;
-                          });
-                        },
-                      ),
-                    IconButton(
-                      icon: Icon(Icons.close),
-                      onPressed: () {
-                        setState(() {
-                          selectedNode!.post.title =
-                              titleController.text; // 화면 취소로 닫아도 작성하던 정보는 저장.
-                          selectedNode!.post.markdownContent =
-                              contentController.text;
-                          isEditing = false; // 화면을 닫으면 편집모드 종료
-                          selectedNode!.showOrbit = false;
-                          selectedNode = null;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                if (!isEditing)
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        isEditing = true; // 텍스트 영역 클릭 시 편집 모드 활성화
-                      });
-                    },
-                    child: Text(selectedNode!.post.title,
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
-                  ),
-                if (isEditing)
-                  TextField(
-                    controller: titleController,
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    decoration: InputDecoration(
-                      hintText: 'Enter title',
-                      border: InputBorder.none,
-                    ),
-                  ),
-                SizedBox(
-                    height:
-                        16), // For some spacing between the title and content
-                Expanded(
-                  child: isEditing
-                      ? TextField(
-                          controller: contentController,
-                          style: TextStyle(fontSize: 16),
-                          maxLines: null,
-                          decoration: InputDecoration(
-                            hintText: 'Enter content',
-                            border: InputBorder.none,
-                          ),
-                        )
-                      : GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              isEditing = true; // 텍스트 영역 클릭 시 편집 모드 활성화
-                            });
-                          },
-                          child: MarkdownBody(
-                            softLineBreak: true,
-                            data: selectedNode!.post.markdownContent,
-                            styleSheet:
-                                MarkdownStyleSheet.fromTheme(Theme.of(context))
-                                    .copyWith(
-                              p: Theme.of(context)
-                                  .textTheme
-                                  .bodyLarge!
-                                  .copyWith(fontSize: 16), // 폰트 크기 16으로 설정
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
+      top: 32,
+      right: 32,
+      bottom: 32,
+      child: GestureDetector(
+        onTap: () {
+          if (isEditing) _enterViewMode();
+        },
+        behavior: HitTestBehavior.opaque,
+        child: _buildNoteContainer(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeaderRow(),
+              _buildTitleSection(),
+              SizedBox(height: 16),
+              _buildContentSection(),
+            ],
           ),
-        ));
+        ),
+      ),
+    );
+  }
+
+  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
+  void _enterViewMode() {
+    setState(() {
+      if (selectedNode != null) {
+        selectedNode!.post.title = titleController.text;
+        selectedNode!.post.markdownContent = contentController.text;
+      }
+      isEditing = false;
+    });
+  }
+
+  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
+  void _enterEditMode() {
+    setState(() {
+      if (selectedNode != null) {
+        titleController.text = selectedNode!.post.title;
+        contentController.text = selectedNode!.post.markdownContent;
+      }
+      isEditing = true;
+    });
+  }
+
+  // 노트 뷰 컨테이너 위젯
+  Widget _buildNoteContainer(Widget child) {
+    return Container(
+      width: 400, // 창의 너비를 400으로 고정
+      padding: EdgeInsets.symmetric(
+          horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: child, // 내부 내용은 주어진 child 위젯으로 동적 할당
+    );
+  }
+
+  Widget _buildHeaderRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        if (isEditing)
+          IconButton(icon: Icon(Icons.edit), onPressed: _enterViewMode),
+        if (!isEditing)
+          IconButton(
+              icon: Icon(Icons.my_library_books_rounded),
+              onPressed: _enterEditMode),
+        IconButton(
+          icon: Icon(Icons.close),
+          onPressed: () {
+            setState(() {
+              _enterViewMode();
+              selectedNode!.showOrbit = false;
+              selectedNode = null;
+            });
+          },
+        )
+      ],
+    );
+  }
+
+  //note_view의 타이틀 섹션, 클릭하면 editmode로 전환
+  Widget _buildTitleSection() {
+    return isEditing
+        ? _buildTitleTextField()
+        : GestureDetector(
+            onTap: _enterEditMode,
+            child: Text(selectedNode!.post.title,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)));
+  }
+
+  //note_view의 컨텐츠 섹션, 클릭하면 editmode로 전환
+  Widget _buildContentSection() {
+    return Expanded(
+      child: isEditing
+          ? _buildContentTextField()
+          : GestureDetector(
+              onTap: _enterEditMode,
+              child: MarkdownBody(
+                softLineBreak: true,
+                data: selectedNode!.post.markdownContent,
+                styleSheet:
+                    MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                  p: Theme.of(context)
+                      .textTheme
+                      .bodyLarge!
+                      .copyWith(fontSize: 16), // 폰트 크기 16으로 설정
+                ),
+              )),
+    );
+  }
+
+  Widget _buildTitleTextField() {
+    return TextField(
+      controller: titleController,
+      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      decoration:
+          InputDecoration(hintText: 'Enter title', border: InputBorder.none),
+    );
+  }
+
+  Widget _buildContentTextField() {
+    return TextField(
+      controller: contentController,
+      style: TextStyle(fontSize: 16),
+      maxLines: null,
+      decoration:
+          InputDecoration(hintText: 'Enter content', border: InputBorder.none),
+    );
   }
 }
 
