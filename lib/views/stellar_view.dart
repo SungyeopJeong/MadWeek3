@@ -33,6 +33,31 @@ class _StellarViewState extends State<StellarView>
   TextEditingController titleController = TextEditingController();
   TextEditingController contentController = TextEditingController();
 
+  // 뷰를 이동시키기 위한 Controller
+  final TransformationController _transformationController =
+      TransformationController();
+
+  // 뷰를 이동시킬 때 애니메이션을 적용하기 위한 선언
+  late AnimationController _animationController;
+  late Animation<Matrix4> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    // AnimationController 초기화
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    // AnimationController 정리
+    _animationController.dispose();
+    super.dispose();
+  }
+
   bool isIn(Offset leftTop, Offset rightBottom, Offset target, bool isCircle) {
     if (isCircle) {
       final center = (leftTop + rightBottom) / 2;
@@ -60,6 +85,7 @@ class _StellarViewState extends State<StellarView>
               child: Stack(
                 children: [
                   InteractiveViewer(
+                    transformationController: _transformationController,
                     child: GestureDetector(
                       onTapDown: (details) {
                         if (mode == Mode.add) {
@@ -180,15 +206,26 @@ class _StellarViewState extends State<StellarView>
       child: GestureDetector(
         onTap: () {
           setState(() {
+            // 이전 노드의 정보를 저장합니다.
+            if (isEditing && selectedNode != null) {
+              selectedNode!.post.title = titleController.text;
+              selectedNode!.post.markdownContent = contentController.text;
+            }
+
+            // 새 노드를 선택합니다.
             if (selectedNode != node) {
-              // 새로운 노드를 선택한 경우, 이전 선택된 노드의 orbit을 해제
-              if (selectedNode != null) {
-                selectedNode!.showOrbit = false;
-                selectedNode!.planetAnimation.reset();
-              }
-              selectedNode = node;
+              selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
+              selectedNode?.planetAnimation.reset();
+
+              selectedNode = node; // 새로운 노드를 선택된 노드로 설정합니다.
               selectedNode!.showOrbit = true;
               selectedNode!.planetAnimation.repeat();
+
+              // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+              titleController.text = selectedNode!.post.title;
+              contentController.text = selectedNode!.post.markdownContent;
+
+              _focusOnNode(node); // 뷰포트 이동
             }
           });
         },
@@ -385,9 +422,38 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
-  /*
-    선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
-  */
+  void _focusOnNode(Node node) {
+    // 시작 행렬
+    final Matrix4 startMatrix = _transformationController.value;
+    // 최종 행렬
+    final Matrix4 endMatrix = Matrix4.identity()
+      ..scale(3.0)
+      ..translate(
+        -node.pos.dx + MediaQuery.of(context).size.width / 4 / 3,
+        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 3,
+      );
+
+    // Tween을 사용하여 시작과 끝 행렬 사이를 보간합니다.
+    _animation = Matrix4Tween(
+      begin: startMatrix,
+      end: endMatrix,
+    ).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    // 리스너를 추가하여 변환 컨트롤러의 값을 업데이트합니다.
+    _animation.addListener(() {
+      _transformationController.value = _animation.value;
+    });
+
+    // 애니메이션을 시작합니다.
+    _animationController.forward(from: 0.0);
+  }
+
+  //선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
   Widget _buildNoteView() {
     if (!isStarSelected) {
       return SizedBox.shrink();
@@ -458,6 +524,7 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  // 노트뷰의 상단, 아이콘 배치 위젯
   Widget _buildHeaderRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -482,7 +549,7 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
-  //note_view의 타이틀 섹션, 클릭하면 editmode로 전환
+  //note_view의 타이틀 섹션 위젯, 클릭하면 editmode로 전환
   Widget _buildTitleSection() {
     return isEditing
         ? _buildTitleTextField()
@@ -492,7 +559,7 @@ class _StellarViewState extends State<StellarView>
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)));
   }
 
-  //note_view의 컨텐츠 섹션, 클릭하면 editmode로 전환
+  //note_view의 컨텐츠 섹션 위젯, 클릭하면 editmode로 전환
   Widget _buildContentSection() {
     return Expanded(
       child: isEditing
