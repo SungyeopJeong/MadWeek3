@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/views/stellar_view.dart';
 
 void main() {
@@ -10,9 +12,14 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: StellarView(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => NoteViewModel()),
+      ],
+      child: const MaterialApp(
+        home: Scaffold(
+          body: StellarView(),
+        ),
       ),
     );
   }

@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:provider/provider.dart';
 import 'package:week3/const/color.dart';
 import 'package:week3/const/size.dart';
 import 'package:week3/enums/mode.dart';
@@ -13,6 +13,8 @@ import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
+import 'package:week3/viewmodels/note_view_model.dart';
+import 'package:week3/views/note_view.dart';
 
 class StellarView extends StatefulWidget {
   const StellarView({super.key});
@@ -34,11 +36,6 @@ class _StellarViewState extends State<StellarView>
   bool get isStarSelected => selectedNode != null; // 별이 선택되었는지 여부를 추적하는 변수
   Star? selectedNode; // 선택된 노드 추적
 
-  //텍스트 수정을 위한 선언
-  bool isNoteEditing = false;
-  TextEditingController titleController = TextEditingController();
-  TextEditingController contentController = TextEditingController();
-
   // 뷰를 이동시키기 위한 Controller
   final TransformationController _transformationController =
       TransformationController();
@@ -48,8 +45,8 @@ class _StellarViewState extends State<StellarView>
   late Animation<Matrix4> _animation;
 
   // 뷰의 최소 / 최대 배율, 현재 배율 저장 변수
-  double _minScale = 1.0;
-  double _maxScale = 4.0;
+  final double _minScale = 1.0;
+  final double _maxScale = 4.0;
   double _currentScale = 1.0;
 
   final _exception = Exception('Unable to classify');
@@ -90,16 +87,6 @@ class _StellarViewState extends State<StellarView>
                   mode = Mode.add;
                 });
               },
-              const SingleActivator(LogicalKeyboardKey.escape): () {
-                setState(() {
-                  if (isNoteEditing) {
-                    _enterViewMode();
-                  } else {
-                    selectedNode!.showOrbit = false;
-                    selectedNode = null;
-                  }
-                });
-              }
             },
             child: Focus(
               autofocus: true,
@@ -117,7 +104,15 @@ class _StellarViewState extends State<StellarView>
               ),
             ),
           ),
-          _buildNoteView(),
+          if (isStarSelected)
+            NoteView(
+              star: selectedNode!,
+              onClose: () {
+                setState(() {
+                  selectedNode = null;
+                });
+              },
+            ),
         ],
       ),
       floatingActionButton: _buildFAB(),
@@ -139,6 +134,13 @@ class _StellarViewState extends State<StellarView>
                 ..planetAnimation = AnimationController(vsync: this),
             );
             mode = Mode.none;
+          });
+        }
+        if (selectedNode != null) {
+          setState(() {
+            selectedNode?.showOrbit = false;
+            selectedNode?.planetAnimation.reset();
+            selectedNode = null;
           });
         }
       },
@@ -507,12 +509,6 @@ class _StellarViewState extends State<StellarView>
         },
         onTap: () {
           setState(() {
-            // 이전 노드의 정보를 저장합니다.
-            if (isNoteEditing && selectedNode != null) {
-              selectedNode!.post.title = titleController.text;
-              selectedNode!.post.markdownContent = contentController.text;
-            }
-
             // 새 노드를 선택합니다.
             if (selectedNode != star) {
               selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
@@ -524,8 +520,10 @@ class _StellarViewState extends State<StellarView>
                   .repeat(period: Duration(seconds: 10));
 
               // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
-              titleController.text = selectedNode!.post.title;
-              contentController.text = selectedNode!.post.markdownContent;
+              context.read<NoteViewModel>().titleController.text =
+                  selectedNode!.post.title;
+              context.read<NoteViewModel>().contentController.text =
+                  selectedNode!.post.markdownContent;
 
               _focusOnNode(star); // 뷰포트 이동
             }
@@ -788,179 +786,6 @@ class _StellarViewState extends State<StellarView>
 
     // 애니메이션을 시작합니다.
     _animationController.forward(from: 0.0);
-  }
-
-  //선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
-  Widget _buildNoteView() {
-    if (!isStarSelected) {
-      return SizedBox.shrink();
-    }
-    return Positioned(
-        top: 32,
-        right: 32,
-        bottom: 32,
-        child: /*Focus(
-          autofocus: true,
-          onKey: (FocusNode node, RawKeyEvent event) {
-            // ESC 키가 눌렸는지 확인합니다.
-            if (event is RawKeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              // 에딧모드라면 뷰모드로 전환합니다.
-              if (isNoteEditing) {
-                setState(() {
-                  _enterViewMode();
-                });
-                // 이벤트 처리를 중단합니다.
-                return KeyEventResult.handled;
-              }
-              // 에딧모드가 아니라면 노트를 닫습니다.
-              setState(() {
-                selectedNode!.showOrbit = false;
-                selectedNode = null;
-              });
-              // 이벤트 처리를 중단합니다.
-              return KeyEventResult.handled;
-            }
-            // 다른 키 이벤트는 무시합니다.
-            return KeyEventResult.ignored;
-          },
-          child:*/
-            GestureDetector(
-          onTap: () {
-            if (isNoteEditing) _enterViewMode();
-          },
-          behavior: HitTestBehavior.opaque,
-          child: _buildNoteContainer(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeaderRow(),
-                _buildTitleSection(),
-                SizedBox(height: 16),
-                _buildContentSection(),
-              ],
-            ),
-          ),
-          //),
-        ));
-  }
-
-  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
-  void _enterViewMode() {
-    setState(() {
-      if (selectedNode != null) {
-        selectedNode!.post.title = titleController.text;
-        selectedNode!.post.markdownContent = contentController.text;
-      }
-      isNoteEditing = false;
-    });
-  }
-
-  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
-  void _enterEditMode() {
-    setState(() {
-      if (selectedNode != null) {
-        titleController.text = selectedNode!.post.title;
-        contentController.text = selectedNode!.post.markdownContent;
-      }
-      isNoteEditing = true;
-    });
-  }
-
-  // 노트 뷰 컨테이너 위젯
-  Widget _buildNoteContainer(Widget child) {
-    return Container(
-      width: 400, // 창의 너비를 400으로 고정
-      padding: EdgeInsets.symmetric(
-          horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: child, // 내부 내용은 주어진 child 위젯으로 동적 할당
-    );
-  }
-
-  // 노트뷰의 상단, 아이콘 배치 위젯
-  Widget _buildHeaderRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        if (isNoteEditing)
-          IconButton(icon: Icon(Icons.edit), onPressed: _enterViewMode),
-        if (!isNoteEditing)
-          IconButton(
-              icon: Icon(Icons.my_library_books_rounded),
-              onPressed: _enterEditMode),
-        IconButton(
-          icon: Icon(Icons.close),
-          onPressed: () {
-            setState(() {
-              _enterViewMode();
-              (selectedNode as Star).showOrbit = false;
-              selectedNode = null;
-            });
-          },
-        )
-      ],
-    );
-  }
-
-  //note_view의 타이틀 섹션 위젯, 클릭하면 editmode로 전환
-  Widget _buildTitleSection() {
-    return isNoteEditing
-        ? _buildTitleTextField()
-        : GestureDetector(
-            onTap: _enterEditMode,
-            child: Text(selectedNode!.post.title,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)));
-  }
-
-  //note_view의 컨텐츠 섹션 위젯, 클릭하면 editmode로 전환
-  Widget _buildContentSection() {
-    return Expanded(
-      child: isNoteEditing
-          ? _buildContentTextField()
-          : GestureDetector(
-              onTap: _enterEditMode,
-              child: MarkdownBody(
-                softLineBreak: true,
-                data: selectedNode!.post.markdownContent,
-                styleSheet:
-                    MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                  p: Theme.of(context)
-                      .textTheme
-                      .bodyLarge!
-                      .copyWith(fontSize: 16), // 폰트 크기 16으로 설정
-                ),
-              ),
-            ),
-    );
-  }
-
-  Widget _buildTitleTextField() {
-    return TextField(
-      controller: titleController,
-      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-      decoration:
-          InputDecoration(hintText: 'Enter title', border: InputBorder.none),
-    );
-  }
-
-  Widget _buildContentTextField() {
-    return TextField(
-      controller: contentController,
-      style: TextStyle(fontSize: 16),
-      maxLines: null,
-      decoration:
-          InputDecoration(hintText: 'Enter content', border: InputBorder.none),
-    );
   }
 }
 
