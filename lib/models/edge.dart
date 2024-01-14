@@ -1,17 +1,17 @@
 import 'package:week3/models/node.dart';
 
 class Edge {
-  Node node1, node2;
+  Node start, end;
 
-  Edge(this.node1, this.node2);
+  Edge(this.start, this.end);
 
   @override
   bool operator ==(Object other) {
     if (other is! Edge) return false;
-    return (node1 == other.node1 && node2 == other.node2) ||
-        (node1 == other.node2 && node2 == other.node1);
+    return (start == other.start && end == other.end) ||
+        (start == other.end && end == other.start);
   }
 
   @override
-  int get hashCode => Object.hash(node1, node2);
+  int get hashCode => Object.hash(start, end);
 }

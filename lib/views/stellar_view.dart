@@ -1,15 +1,20 @@
-// ignore_for_file: prefer_cR   onst_constructors
+// ignore_for_file: prefer_const_constructors
 
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart'; // Markdown 패키지 임포트
+import 'package:provider/provider.dart';
+import 'package:week3/const/color.dart';
 import 'package:week3/const/size.dart';
 import 'package:week3/enums/mode.dart';
+import 'package:week3/extensions/offset.dart';
+import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
+import 'package:week3/viewmodels/note_view_model.dart';
+import 'package:week3/views/note_view.dart';
 
 class StellarView extends StatefulWidget {
   const StellarView({super.key});
@@ -20,18 +25,16 @@ class StellarView extends StatefulWidget {
 
 class _StellarViewState extends State<StellarView>
     with TickerProviderStateMixin {
-  List<Node> nodes = [];
-  List<Edge> edges = [];
+  Graph graph = Graph();
   Node? origin;
+  Planet? tempPlanet;
+  Edge? originEdge;
   Mode mode = Mode.none;
-  bool blackholeEnabled = false;
-  bool get isStarSelected => selectedNode != null; // 별이 선택되었는지 여부를 추적하는 변수
-  Node? selectedNode; // 선택된 노드 추적
-
-  //텍스트 수정을 위한 선언
+  bool isBlackholeEnabled = false;
   bool isEditing = false;
-  TextEditingController titleController = TextEditingController();
-  TextEditingController contentController = TextEditingController();
+
+  bool get isStarSelected => selectedNode != null; // 별이 선택되었는지 여부를 추적하는 변수
+  Star? selectedNode; // 선택된 노드 추적
 
   // 뷰를 이동시키기 위한 Controller
   final TransformationController _transformationController =
@@ -42,9 +45,11 @@ class _StellarViewState extends State<StellarView>
   late Animation<Matrix4> _animation;
 
   // 뷰의 최소 / 최대 배율, 현재 배율 저장 변수
-  double _minScale = 1.0;
-  double _maxScale = 4.0;
+  final double _minScale = 1.0;
+  final double _maxScale = 4.0;
   double _currentScale = 1.0;
+
+  final _exception = Exception('Unable to classify');
 
   @override
   void initState() {
@@ -70,15 +75,6 @@ class _StellarViewState extends State<StellarView>
     super.dispose();
   }
 
-  bool isIn(Offset leftTop, Offset rightBottom, Offset target, bool isCircle) {
-    if (isCircle) {
-      final center = (leftTop + rightBottom) / 2;
-      final radius = leftTop.dx - center.dx;
-      return (target - center).distanceSquared <= radius * radius;
-    }
-    return leftTop <= target && target <= rightBottom;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,7 +86,7 @@ class _StellarViewState extends State<StellarView>
                 setState(() {
                   mode = Mode.add;
                 });
-              }
+              },
             },
             child: Focus(
               autofocus: true,
@@ -100,48 +96,7 @@ class _StellarViewState extends State<StellarView>
                     minScale: _minScale,
                     maxScale: _maxScale,
                     transformationController: _transformationController,
-                    child: GestureDetector(
-                      onTapDown: (details) {
-                        if (mode == Mode.add) {
-                          setState(() {
-                            Node newNode = _createNode(
-                              details.localPosition,
-                              id: nodes
-                                  .length, // 'id' is based on the length of 'nodes' list
-                            )..post = Post(
-                                title: "Title Here",
-                                markdownContent:
-                                    "Content Here"); // Create an associated empty Post
-
-                            nodes.add(newNode);
-                            mode = Mode.none;
-                          });
-                        }
-                      },
-                      onSecondaryTap: () {
-                        // 마우스 오른쪽 클릭 이벤트 처리
-                        setState(() {
-                          mode = Mode.none; // 별 생성 모드 취소
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: mode == Mode.add
-                            ? SystemMouseCursors.precise
-                            : MouseCursor.defer,
-                        child: Container(
-                          color: Color(0xFFF3F0E9),
-                          width: double.maxFinite,
-                          height: double.maxFinite,
-                          child: Stack(
-                            children: [
-                              ...nodes.map((star) => _buildNode(context, star)),
-                              if (origin != null)
-                                _buildOriginNode(origin!), // `origin` 위젯 추가
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    child: _buildBody(),
                   ),
                   _buildBlackhole(),
                   _buildZoomSlider(),
@@ -149,109 +104,473 @@ class _StellarViewState extends State<StellarView>
               ),
             ),
           ),
-          _buildNoteView(),
+          if (isStarSelected)
+            NoteView(
+              star: selectedNode!,
+              onClose: () {
+                setState(() {
+                  selectedNode = null;
+                });
+              },
+            ),
         ],
       ),
-      floatingActionButton: GestureDetector(
-        onTapUp: (details) {
+      floatingActionButton: _buildFAB(),
+    );
+  }
+
+  Widget _buildBody() {
+    return GestureDetector(
+      onTapDown: (details) {
+        if (mode == Mode.add) {
           setState(() {
-            mode = Mode.add;
+            graph.addNode(
+              Star(pos: details.localPosition)
+                ..post = Post(
+                  title: "Title Here",
+                  markdownContent: "Content Here",
+                )
+                ..planets = []
+                ..planetAnimation = AnimationController(vsync: this),
+            );
+            mode = Mode.none;
           });
-        },
+        }
+        if (selectedNode != null) {
+          setState(() {
+            selectedNode?.showOrbit = false;
+            selectedNode?.planetAnimation.reset();
+            selectedNode = null;
+          });
+        }
+      },
+      onSecondaryTap: () {
+        // 마우스 오른쪽 클릭 이벤트 처리
+        setState(() {
+          mode = Mode.none; // 별 생성 모드 취소
+        });
+      },
+      child: MouseRegion(
+        cursor:
+            mode == Mode.add ? SystemMouseCursors.precise : MouseCursor.defer,
         child: Container(
-          decoration: BoxDecoration(
-            color: Color(0xFF4D4D4D),
-            shape: BoxShape.circle,
-          ),
-          width: 60,
-          height: 60,
-          child: Icon(
-            Icons.insights,
-            color: Colors.white,
+          color: MyColor.bg,
+          width: double.maxFinite,
+          height: double.maxFinite,
+          child: Stack(
+            children: [
+              CustomPaint(
+                size: Size(double.maxFinite, double.maxFinite),
+                painter: EdgePainter(
+                  graph.edges,
+                  originEdge: originEdge,
+                ),
+              ),
+              ..._buildNodes(graph.nodes),
+              if (origin != null) _buildOrigin(origin!),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Node _createNode(Offset position, {int id = -1}) {
-    return Node(
-      position,
-      //d: id,
-    )..planetAnimation = AnimationController(
-        vsync: this,
-        upperBound: 2 * pi,
-        duration: Duration(seconds: 10),
-      );
+  Widget _buildFAB() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          mode = Mode.add;
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: MyColor.surface,
+          shape: BoxShape.circle,
+        ),
+        width: 60,
+        height: 60,
+        child: Icon(
+          Icons.insights,
+          color: MyColor.onSurface,
+        ),
+      ),
+    );
   }
 
-  Widget _buildNode(BuildContext context, Node node) {
-    if (node.isDeleting) {
-      return TweenAnimationBuilder(
-        tween: Tween(
-          begin: node.pos,
-          end: Offset(0, MediaQuery.of(context).size.height),
+  List<Widget> _buildNodes(List<Node> nodes) {
+    return nodes.skipWhile((node) => node is Planet).map((node) {
+      switch (node) {
+        case Star():
+          return _buildStar(node);
+        case Constellation():
+          return _buildConstellation(node);
+        default:
+          throw _exception;
+      }
+    }).toList();
+  }
+
+  Widget _buildDeletingNode(Node node, Widget Function(Offset) childBuilder) {
+    return TweenAnimationBuilder(
+      tween: Tween(
+        begin: node.pos,
+        end: Offset(0, MediaQuery.of(context).size.height),
+      ),
+      duration: Duration(milliseconds: 250),
+      onEnd: () {
+        setState(() {
+          graph.removeNode(node);
+        });
+      },
+      builder: (_, val, __) => childBuilder(val),
+    );
+  }
+
+  Widget _buildHelper(double size, List<Widget> children) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildColoredCircle(
+    double size,
+    Color color, {
+    BoxBorder? border,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        border: border,
+        shape: BoxShape.circle,
+      ),
+      width: size,
+      height: size,
+    );
+  }
+
+  Widget _buildPlanetCenter(Planet planet) {
+    return Visibility(
+      visible: planet.showPlanet,
+      child: _buildColoredCircle(
+        planetSize,
+        planet == tempPlanet ? MyColor.star : MyColor.planet,
+      ),
+    );
+  }
+
+  Widget _buildPlanetArea(Planet planet) {
+    return Visibility(
+      visible: planet.showArea,
+      child: _buildColoredCircle(
+        planetAreaSize,
+        planet == tempPlanet ? MyColor.starArea : MyColor.planetArea,
+      ),
+    );
+  }
+
+  Widget _buildEmptyPlanet(Planet planet) {
+    return _buildHelper(
+      planetAreaSize,
+      [
+        _buildPlanetArea(planet),
+        _buildPlanetCenter(planet),
+      ],
+    );
+  }
+
+  Widget _buildPlanet(Planet planet) {
+    if (planet.isDeleting) {
+      return _buildDeletingNode(
+        planet,
+        (val) => Positioned(
+          left: val.dx - planetSize / 2,
+          top: val.dy - planetSize / 2,
+          child: _buildPlanetCenter(planet),
         ),
-        duration: Duration(milliseconds: 250),
-        onEnd: () {
+      );
+    }
+    return MouseRegion(
+      onEnter: (_) {
+        if (!isEditing) {
           setState(() {
-            nodes.remove(node);
+            planet.showArea = true;
           });
-        },
-        builder: (_, val, __) => Positioned(
-          left: val.dx - areaSize / 2,
-          top: val.dy - areaSize / 2,
-          child: SizedBox(
-            width: areaSize,
-            height: areaSize,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                _buildArea(node),
-                _buildStar(),
-              ],
-            ),
+        }
+      },
+      onExit: (_) {
+        if (!isEditing) {
+          setState(() {
+            planet.showArea = false;
+          });
+        }
+      },
+      child: _buildEmptyPlanet(planet),
+    );
+  }
+
+  Widget _buildStarCenter(Star star) {
+    return Visibility(
+      visible: star.showStar,
+      child: _buildColoredCircle(
+        starSize,
+        MyColor.star.withOpacity(star == origin ? 0.2 : 1),
+      ),
+    );
+  }
+
+  Widget _buildStarArea(Star star) {
+    return Visibility(
+      visible: star.showOrbit ? true : star.showArea,
+      child: _buildColoredCircle(starAreaSize, MyColor.starArea),
+    );
+  }
+
+  Widget _buildStarOrbit(Star star) {
+    return Visibility(
+      visible: star.showOrbit,
+      child: _buildHelper(
+        starTotalSize,
+        [
+          _buildColoredCircle(
+            starOrbitSize,
+            MyColor.starOrbit,
+            border: Border.all(color: MyColor.star),
           ),
+          AnimatedBuilder(
+            animation: star.planetAnimation,
+            builder: (_, __) {
+              final alpha = star.planetAnimation.value * 2 * pi;
+              const radius = starOrbitSize / 2;
+              for (final planetWithIndex in star.planets.indexed) {
+                final index = planetWithIndex.$1;
+                final planet = planetWithIndex.$2;
+                final angle = index * 2 * pi / star.planets.length + alpha;
+                final x = radius * cos(angle);
+                final y = radius * sin(angle);
+                planet.pos = star.pos + Offset(x, y);
+              }
+              return Stack(
+                children: star.planets
+                    .map(
+                      (planet) => Positioned(
+                        left: starTotalSize / 2 +
+                            planet.pos.dx -
+                            star.pos.dx -
+                            planetAreaSize / 2,
+                        top: starTotalSize / 2 +
+                            planet.pos.dy -
+                            star.pos.dy -
+                            planetAreaSize / 2,
+                        child: _buildPlanet(planet),
+                      ),
+                    )
+                    .toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyStar(Star star) {
+    return _buildHelper(
+      starTotalSize,
+      [
+        _buildStarOrbit(star),
+        _buildStarArea(star),
+        _buildStarCenter(star),
+      ],
+    );
+  }
+
+  void _setOnPanStart(Node node) {
+    isEditing = true;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        origin = Star(pos: node.pos)
+          ..id = 0
+          ..planets = []
+          ..planetAnimation = AnimationController(vsync: this);
+        originEdge = Edge(origin!, node);
+      default:
+        throw _exception;
+    }
+  }
+
+  void _setOnPanEnd(Node node) {
+    isEditing = false;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            (other as Star).showOrbit = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              other.addPlanet(Planet(star: other));
+              tempPlanet = null;
+            }
+            if (other.planetAnimation.isAnimating) {
+              other.planetAnimation.reset();
+            }
+            break;
+          }
+        }
+
+        originEdge = null;
+        origin = null;
+      default:
+        throw _exception;
+    }
+  }
+
+  void _caseProcess(Node node) {
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            (other as Star).showOrbit = true;
+            if (tempPlanet == null) {
+              tempPlanet = Planet(star: other, showArea: true)..id = 0;
+              other.planets.add(tempPlanet!);
+              originEdge!.end = tempPlanet!;
+            }
+            if (!other.planetAnimation.isAnimating) {
+              other.planetAnimation.repeat(period: Duration(seconds: 10));
+            }
+          } else {
+            (other as Star).showOrbit = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              tempPlanet = null;
+              originEdge!.end = node;
+            }
+            if (other.planetAnimation.isAnimating) {
+              other.planetAnimation.reset();
+            }
+          }
+        }
+      default:
+        throw _exception;
+    }
+  }
+
+  Widget _buildStar(Star star) {
+    if (star.isDeleting) {
+      return _buildDeletingNode(
+        star,
+        (val) => Positioned(
+          left: val.dx - starSize / 2,
+          top: val.dy - starSize / 2,
+          child: _buildStarCenter(star),
         ),
       );
     }
     return Positioned(
-      left: node.pos.dx - orbitSize / 2,
-      top: node.pos.dy - orbitSize / 2,
+      left: star.pos.dx - starTotalSize / 2,
+      top: star.pos.dy - starTotalSize / 2,
       child: GestureDetector(
-        onTap: () {
+        onPanStart: (details) {
           setState(() {
-            // 이전 노드의 정보를 저장합니다.
-            if (isEditing && selectedNode != null) {
-              selectedNode!.post.title = titleController.text;
-              selectedNode!.post.markdownContent = contentController.text;
-            }
-
-            // 새 노드를 선택합니다.
-            if (selectedNode != node) {
-              selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
-              selectedNode?.planetAnimation.reset();
-
-              selectedNode = node; // 새로운 노드를 선택된 노드로 설정합니다.
-              selectedNode!.showOrbit = true;
-              selectedNode!.planetAnimation.repeat();
-
-              // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
-              titleController.text = selectedNode!.post.title;
-              contentController.text = selectedNode!.post.markdownContent;
-
-              _focusOnNode(node); // 뷰포트 이동
-            }
+            _setOnPanStart(star);
           });
         },
         onPanUpdate: (details) {
-          setState(() {
-            origin ??= _createNode(node.pos, id: -1);
+          if (star.showArea) {
+            // star following cursor if area shown(interactive)
+            setState(() {
+              star.pos += details.delta;
 
-            void updateOrbit(Node? other) {
+              _caseProcess(star);
+            });
+          }
+        },
+        onPanEnd: (_) {
+          setState(() {
+            _setOnPanEnd(star);
+            star.isDeleting = isBlackholeEnabled;
+          });
+        },
+        onTap: () {
+          setState(() {
+            // 새 노드를 선택합니다.
+            if (selectedNode != star) {
+              selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
+              selectedNode?.planetAnimation.reset();
+
+              selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
+              selectedNode!.showOrbit = true;
+              selectedNode!.planetAnimation
+                  .repeat(period: Duration(seconds: 10));
+
+              // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+              context.read<NoteViewModel>().titleController.text =
+                  selectedNode!.post.title;
+              context.read<NoteViewModel>().contentController.text =
+                  selectedNode!.post.markdownContent;
+
+              _focusOnNode(star); // 뷰포트 이동
+            }
+          });
+        },
+        child: MouseRegion(
+          onHover: (details) {
+            setState(() {
+              // show area if mouse in area
+              star.showArea = details.localPosition.closeTo(
+                OffsetExt.center(starTotalSize),
+                starAreaSize,
+              );
+            });
+          },
+          child: _buildEmptyStar(star),
+        ),
+      ),
+    );
+    /*GestureDetector(
+        onPanUpdate: (details) {
+          setState(() {
+            //원래자리에 노드 모양 위젯 생성
+            origin ??= Node(node.pos)
+              ..planetAnimation = AnimationController(
+                vsync: this,
+                upperBound: 2 * pi,
+                duration: Duration(seconds: 10),
+              );
+            origin!.showStar = false;
+            originEdge = Edge(origin!, node);
+            node.showStar = true;
+
+            void updateState(Node? other) {
               if (other == node || other == null) return;
-              if ((other.pos - node.pos).distanceSquared <=
-                  orbitSize * orbitSize / 4) {
+              final distanceSquared = (other.pos - node.pos).distanceSquared;
+              double radiusSquared(double diameter) => diameter * diameter / 4;
+              if (distanceSquared <= radiusSquared(areaSize)) {
+                final edge = Edge(origin!, other);
+                if (!edges.any((element) => element == edge)) {
+                  origin!.showStar = true;
+                  originEdge = edge;
+                  node.showStar = false;
+                }
+                return;
+              }
+              if (distanceSquared <= radiusSquared(orbitSize)) {
                 other.showOrbit = true;
                 if (!other.planetAnimation.isAnimating) {
                   other.planetAnimation.repeat();
@@ -265,158 +584,69 @@ class _StellarViewState extends State<StellarView>
             }
 
             for (final other in nodes) {
-              updateOrbit(other);
+              updateState(other);
             }
             if (mode == Mode.add) {
-              updateOrbit(origin);
+              updateState(origin);
             }
-
-            node.pos += details.delta;
           });
         },
         onPanEnd: (details) {
           setState(() {
             for (final node in nodes) {
-              if (node != selectedNode) node.showOrbit = false;
+              node.showOrbit = false;
+            }
+
+            if (origin?.showStar ?? false) {
+              node.pos = origin!.pos;
+              node.showStar = true;
+              originEdge!.node1 = node;
+              if (!edges.contains(originEdge)) {
+                edges.add(originEdge!);
+              }
             }
 
             origin = null; // `origin`을 `null`로 설정
-
-            if (blackholeEnabled) {
-              node.isDeleting = true;
-            }
+            originEdge = null;
           });
         },
-        child: SizedBox(
-          width: orbitSize,
-          height: orbitSize,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              _buildOrbit(node),
-              _buildArea(node),
-              _buildStar(),
-            ],
-          ),
-        ),
-      ),
-    );
+      )*/
   }
 
-  Widget _buildOriginNode(Node node) {
-    return Positioned(
-      left: node.pos.dx - orbitSize / 2,
-      top: node.pos.dy - orbitSize / 2,
-      child: SizedBox(
-        width: orbitSize,
-        height: orbitSize,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            _buildOrbit(node),
-            Opacity(
-              opacity: 0.2,
-              child: _buildStar(),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget _buildOrigin(Node node) {
+    switch (node) {
+      case Planet():
+        return _buildEmptyPlanet(node);
+      case Star():
+        return Positioned(
+          left: node.pos.dx - starTotalSize / 2,
+          top: node.pos.dy - starTotalSize / 2,
+          child: _buildEmptyStar(node),
+        );
+      default:
+        throw _exception;
+    }
   }
 
-  Widget _buildOrbit(Node star) {
-    return Visibility(
-      visible: star.showOrbit,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Color(0xFFE5C33E).withOpacity(0.05),
-              border: Border.all(color: Color(0xFFE5C33E)),
-              shape: BoxShape.circle,
-            ),
-            width: orbitSize,
-            height: orbitSize,
-          ),
-          /*TweenAnimationBuilder(
-            tween: Tween(
-              begin: 0,
-              end: 2 * pi,
-            ),
-            duration: Duration(seconds: 10),
-            builder: (_, val, __) => Positioned(
-              left: (orbitSize * (cos(val) + 1) - planetSize) / 2,
-              top: (orbitSize * (sin(val) + 1) - planetSize) / 2,
-              child: _buildPlanet(),
-            ),*/
-          AnimatedBuilder(
-            animation: star.planetAnimation,
-            builder: (_, __) => Positioned(
-              left: (orbitSize * (cos(star.planetAnimation.value) + 1) -
-                      planetSize) /
-                  2,
-              top: (orbitSize * (sin(star.planetAnimation.value) + 1) -
-                      planetSize) /
-                  2,
-              child: _buildPlanet(),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildArea(Node star) {
-    return Visibility(
-      visible: star.showArea,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Color(0xFFE5C33E).withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        width: areaSize,
-        height: areaSize,
-      ),
-    );
-  }
-
-  Widget _buildStar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Color(0xFFE5C33E),
-        shape: BoxShape.circle,
-      ),
-      width: starSize,
-      height: starSize,
-    );
-  }
-
-  Widget _buildPlanet() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Color(0xFFE5C33E),
-        shape: BoxShape.circle,
-      ),
-      width: planetSize,
-      height: planetSize,
-    );
+  Widget _buildConstellation(Constellation constellation) {
+    return Placeholder();
   }
 
   Widget _buildBlackhole() {
+    final blackholeSize =
+        isBlackholeEnabled ? blackholeMaxSize : blackholeMinSize;
     return Positioned(
       left: -blackholeAreaSize / 2,
       bottom: -blackholeAreaSize / 2,
       child: MouseRegion(
         onEnter: (_) {
           setState(() {
-            blackholeEnabled = true;
+            isBlackholeEnabled = true;
           });
         },
         onExit: (_) {
           setState(() {
-            blackholeEnabled = false;
+            isBlackholeEnabled = false;
           });
         },
         child: Container(
@@ -426,11 +656,11 @@ class _StellarViewState extends State<StellarView>
           child: AnimatedContainer(
             duration: Duration(milliseconds: 100),
             decoration: BoxDecoration(
-              color: Colors.black,
+              color: MyColor.blackhole,
               shape: BoxShape.circle,
             ),
-            width: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
-            height: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
+            width: blackholeSize,
+            height: blackholeSize,
           ),
         ),
       ),
@@ -557,200 +787,47 @@ class _StellarViewState extends State<StellarView>
     // 애니메이션을 시작합니다.
     _animationController.forward(from: 0.0);
   }
-
-  //선택한 별이 있는지 확인하고 선택된게 있다면 해당 Node의 Post의 title과 markdownContent를 불러와서 화면에 보여주는 위젯
-  Widget _buildNoteView() {
-    if (!isStarSelected) {
-      return SizedBox.shrink();
-    }
-    return Positioned(
-        top: 32,
-        right: 32,
-        bottom: 32,
-        child: Focus(
-          autofocus: true,
-          onKey: (FocusNode node, RawKeyEvent event) {
-            // ESC 키가 눌렸는지 확인합니다.
-            if (event is RawKeyDownEvent &&
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              // 에딧모드라면 뷰모드로 전환합니다.
-              if (isEditing) {
-                setState(() {
-                  _enterViewMode();
-                });
-                // 이벤트 처리를 중단합니다.
-                return KeyEventResult.handled;
-              }
-              // 에딧모드가 아니라면 노트를 닫습니다.
-              setState(() {
-                selectedNode!.showOrbit = false;
-                selectedNode = null;
-              });
-              // 이벤트 처리를 중단합니다.
-              return KeyEventResult.handled;
-            }
-            // 다른 키 이벤트는 무시합니다.
-            return KeyEventResult.ignored;
-          },
-          child: GestureDetector(
-            onTap: () {
-              if (isEditing) _enterViewMode();
-            },
-            behavior: HitTestBehavior.opaque,
-            child: _buildNoteContainer(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeaderRow(),
-                  _buildTitleSection(),
-                  SizedBox(height: 16),
-                  _buildContentSection(),
-                ],
-              ),
-            ),
-          ),
-        ));
-  }
-
-  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
-  void _enterViewMode() {
-    setState(() {
-      if (selectedNode != null) {
-        selectedNode!.post.title = titleController.text;
-        selectedNode!.post.markdownContent = contentController.text;
-      }
-      isEditing = false;
-    });
-  }
-
-  // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
-  void _enterEditMode() {
-    setState(() {
-      if (selectedNode != null) {
-        titleController.text = selectedNode!.post.title;
-        contentController.text = selectedNode!.post.markdownContent;
-      }
-      isEditing = true;
-    });
-  }
-
-  // 노트 뷰 컨테이너 위젯
-  Widget _buildNoteContainer(Widget child) {
-    return Container(
-      width: 400, // 창의 너비를 400으로 고정
-      padding: EdgeInsets.symmetric(
-          horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: child, // 내부 내용은 주어진 child 위젯으로 동적 할당
-    );
-  }
-
-  // 노트뷰의 상단, 아이콘 배치 위젯
-  Widget _buildHeaderRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        if (isEditing)
-          IconButton(icon: Icon(Icons.edit), onPressed: _enterViewMode),
-        if (!isEditing)
-          IconButton(
-              icon: Icon(Icons.my_library_books_rounded),
-              onPressed: _enterEditMode),
-        IconButton(
-          icon: Icon(Icons.close),
-          onPressed: () {
-            setState(() {
-              _enterViewMode();
-              selectedNode!.showOrbit = false;
-              selectedNode = null;
-            });
-          },
-        )
-      ],
-    );
-  }
-
-  //note_view의 타이틀 섹션 위젯, 클릭하면 editmode로 전환
-  Widget _buildTitleSection() {
-    return isEditing
-        ? _buildTitleTextField()
-        : GestureDetector(
-            onTap: _enterEditMode,
-            child: Text(selectedNode!.post.title,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)));
-  }
-
-  //note_view의 컨텐츠 섹션 위젯, 클릭하면 editmode로 전환
-  Widget _buildContentSection() {
-    return Expanded(
-      child: isEditing
-          ? _buildContentTextField()
-          : GestureDetector(
-              onTap: _enterEditMode,
-              child: MarkdownBody(
-                softLineBreak: true,
-                data: selectedNode!.post.markdownContent,
-                styleSheet:
-                    MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                  p: Theme.of(context)
-                      .textTheme
-                      .bodyLarge!
-                      .copyWith(fontSize: 16), // 폰트 크기 16으로 설정
-                ),
-              )),
-    );
-  }
-
-  Widget _buildTitleTextField() {
-    return TextField(
-      controller: titleController,
-      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-      decoration:
-          InputDecoration(hintText: 'Enter title', border: InputBorder.none),
-    );
-  }
-
-  Widget _buildContentTextField() {
-    return TextField(
-      controller: contentController,
-      style: TextStyle(fontSize: 16),
-      maxLines: null,
-      decoration:
-          InputDecoration(hintText: 'Enter content', border: InputBorder.none),
-    );
-  }
 }
 
 class EdgePainter extends CustomPainter {
   final List<Edge> edges;
-  final Edge? addMark;
+  final Edge? originEdge;
 
-  EdgePainter(this.edges, {this.addMark});
+  EdgePainter(this.edges, {this.originEdge});
 
   @override
   void paint(Canvas canvas, Size size) {
     void drawLine(Edge edge) {
-      final p1 = edge.node1.pos;
-      final p2 = edge.node2.pos;
+      final p1 = edge.start.pos;
+      final p2 = edge.end.pos;
       final paint = Paint()
-        ..color = Colors.white
+        ..color = MyColor.line
         ..strokeWidth = 1;
       canvas.drawLine(p1, p2, paint);
+    }
+
+    void drawDashedLine(Edge edge) {
+      final p1 = edge.start.pos;
+      final p2 = edge.end.pos;
+      final paint = Paint()
+        ..color = MyColor.dashedLine
+        ..strokeWidth = 2;
+
+      final unit = (p2 - p1) / (p2 - p1).distance;
+      final dash = unit * 10;
+      final gap = unit * 8;
+
+      for (var p = p1;
+          (p + dash - p1).distanceSquared <= (p2 - p1).distanceSquared;
+          p += dash + gap) {
+        canvas.drawLine(p, p + dash, paint);
+      }
     }
 
     for (final edge in edges) {
       drawLine(edge);
     }
-    if (addMark != null) drawLine(addMark!);
+    if (originEdge != null) drawDashedLine(originEdge!);
   }
 
   @override
