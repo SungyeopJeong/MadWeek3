@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:week3/models/post.dart';
 
 class Node {
   Offset pos;
   bool showArea, showOrbit, isDeleting;
+  late Post post;
   late AnimationController planetAnimation;
 
   Node(
