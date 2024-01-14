@@ -277,7 +277,7 @@ class _StellarViewState extends State<StellarView>
         onPanEnd: (details) {
           setState(() {
             for (final node in nodes) {
-              node.showOrbit = false;
+              if (node != selectedNode) node.showOrbit = false;
             }
 
             origin = null; // `origin`을 `null`로 설정
@@ -564,27 +564,52 @@ class _StellarViewState extends State<StellarView>
       return SizedBox.shrink();
     }
     return Positioned(
-      top: 32,
-      right: 32,
-      bottom: 32,
-      child: GestureDetector(
-        onTap: () {
-          if (isEditing) _enterViewMode();
-        },
-        behavior: HitTestBehavior.opaque,
-        child: _buildNoteContainer(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeaderRow(),
-              _buildTitleSection(),
-              SizedBox(height: 16),
-              _buildContentSection(),
-            ],
+        top: 32,
+        right: 32,
+        bottom: 32,
+        child: Focus(
+          autofocus: true,
+          onKey: (FocusNode node, RawKeyEvent event) {
+            // ESC 키가 눌렸는지 확인합니다.
+            if (event is RawKeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              // 에딧모드라면 뷰모드로 전환합니다.
+              if (isEditing) {
+                setState(() {
+                  _enterViewMode();
+                });
+                // 이벤트 처리를 중단합니다.
+                return KeyEventResult.handled;
+              }
+              // 에딧모드가 아니라면 노트를 닫습니다.
+              setState(() {
+                selectedNode!.showOrbit = false;
+                selectedNode = null;
+              });
+              // 이벤트 처리를 중단합니다.
+              return KeyEventResult.handled;
+            }
+            // 다른 키 이벤트는 무시합니다.
+            return KeyEventResult.ignored;
+          },
+          child: GestureDetector(
+            onTap: () {
+              if (isEditing) _enterViewMode();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: _buildNoteContainer(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderRow(),
+                  _buildTitleSection(),
+                  SizedBox(height: 16),
+                  _buildContentSection(),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-    );
+        ));
   }
 
   // 노트뷰에서 편집모드 -> 뷰모드로의 전환 함수
