@@ -437,6 +437,35 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  // 줌슬라이더 만드는 함수
+  Widget _buildZoomSlider() {
+    return Positioned(
+      left: 32,
+      top: (MediaQuery.of(context).size.height - 320) / 2,
+      child: Container(
+        width: 48,
+        height: 320,
+        decoration: BoxDecoration(
+          color: Color(0xFFE5E5E1),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: Offset(0, 0),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.all(4),
+        child: RotatedBox(
+          quarterTurns: 3,
+          child: _customSliderTheme(context, _customSlider(context)),
+        ),
+      ),
+    );
+  }
+
+  // 현재 zoom 상태에 맞게 slider 값 바꾸기
   void _updateZoomSlider() {
     double scale = _transformationController.value.getMaxScaleOnAxis();
     setState(() {
@@ -447,53 +476,57 @@ class _StellarViewState extends State<StellarView>
     });
   }
 
-  Widget _buildZoomSlider() {
-    return Positioned(
-      left: 32,
-      top: (MediaQuery.of(context).size.height - 320) / 2,
-      child: Container(
-        width: 48,
-        height: 320,
-        child: RotatedBox(
-          quarterTurns: 3,
-          child: Slider(
-            value: _currentScale, // 슬라이더 값이 항상 0.0과 1.0 사이가 되도록 합니다.
-            min: 0,
-            max: 1,
-            divisions: 20, // 선택적으로 사용하여 눈금을 표시합니다.
-            onChanged: (newValue) {
-              // 슬라이더의 새 값에 따라 스케일을 계산합니다.
-              double newScale = newValue * (_maxScale - _minScale) + _minScale;
-
-              // 화면의 중앙 좌표를 계산합니다.
-              final screenCenterX = MediaQuery.of(context).size.width / 2;
-              final screenCenterY = MediaQuery.of(context).size.height / 2;
-
-              // 새로운 변환 행렬을 계산합니다.
-              // 화면 중앙을 기준으로 스케일을 적용합니다.
-              Matrix4 newMatrix = Matrix4.identity()
-                ..translate(
-                  -screenCenterX * (newScale - 1),
-                  -screenCenterY * (newScale - 1),
-                )
-                ..scale(newScale);
-
-              // 변환 컨트롤러의 값을 업데이트합니다.
-              _transformationController.value = newMatrix;
-
-              // 현재 스케일 상태를 업데이트합니다.
-              setState(() {
-                _currentScale = newValue;
-              });
-            },
-            activeColor: Theme.of(context).primaryColor,
-            inactiveColor: Theme.of(context).primaryColor.withOpacity(0.2),
-          ),
-        ),
+  //_customSlider의 모양 함수
+  SliderTheme _customSliderTheme(BuildContext context, Widget slider) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 4.0,
+        thumbColor: Color(0xFF4D4D4D),
+        inactiveTrackColor: Color(0xFFC5C5C5),
+        activeTrackColor: Color(0xFF4D4D4D),
+        overlayColor: Colors.transparent,
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 10.0),
+        trackShape: RoundedRectSliderTrackShape(),
       ),
+      child: slider,
     );
   }
 
+  // 슬라이더를 위치시키고 상태를 업데이트
+  Widget _customSlider(BuildContext context) {
+    return Slider(
+      value: _currentScale,
+      min: 0,
+      max: 1,
+      onChanged: (newValue) {
+        // 슬라이더의 새 값에 따라 스케일을 계산합니다.
+        double newScale = newValue * (_maxScale - _minScale) + _minScale;
+
+        // 화면의 중앙 좌표를 계산합니다.
+        final screenCenterX = MediaQuery.of(context).size.width / 2;
+        final screenCenterY = MediaQuery.of(context).size.height / 2;
+
+        // 새로운 변환 행렬을 계산합니다.
+        // 화면 중앙을 기준으로 스케일을 적용합니다.
+        Matrix4 newMatrix = Matrix4.identity()
+          ..translate(
+            -screenCenterX * (newScale - 1),
+            -screenCenterY * (newScale - 1),
+          )
+          ..scale(newScale);
+
+        // 변환 컨트롤러의 값을 업데이트합니다.
+        _transformationController.value = newMatrix;
+
+        // 현재 스케일 상태를 업데이트합니다.
+        setState(() {
+          _currentScale = newValue;
+        });
+      },
+    );
+  }
+
+  // 주어진 노드가 화면 가로 1/4 지점에 오도록 화면을 이동시키는 함수
   void _focusOnNode(Node node) {
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
