@@ -41,6 +41,11 @@ class _StellarViewState extends State<StellarView>
   late AnimationController _animationController;
   late Animation<Matrix4> _animation;
 
+  // 뷰의 최소 / 최대 배율, 현재 배율 저장 변수
+  double _minScale = 1.0;
+  double _maxScale = 4.0;
+  double _currentScale = 1.0;
+
   @override
   void initState() {
     super.initState();
@@ -49,10 +54,17 @@ class _StellarViewState extends State<StellarView>
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
+    _transformationController.addListener(_updateZoomSlider);
+
+// InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
+    _currentScale =
+        (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
+            (_maxScale - _minScale);
   }
 
   @override
   void dispose() {
+    _transformationController.removeListener(_updateZoomSlider);
     // AnimationController 정리
     _animationController.dispose();
     super.dispose();
@@ -85,6 +97,8 @@ class _StellarViewState extends State<StellarView>
               child: Stack(
                 children: [
                   InteractiveViewer(
+                    minScale: _minScale,
+                    maxScale: _maxScale,
                     transformationController: _transformationController,
                     child: GestureDetector(
                       onTapDown: (details) {
@@ -130,6 +144,7 @@ class _StellarViewState extends State<StellarView>
                     ),
                   ),
                   _buildBlackhole(),
+                  _buildZoomSlider(),
                 ],
               ),
             ),
@@ -416,6 +431,63 @@ class _StellarViewState extends State<StellarView>
             ),
             width: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
             height: blackholeEnabled ? blackholeMaxSize : blackholeMinSize,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _updateZoomSlider() {
+    double scale = _transformationController.value.getMaxScaleOnAxis();
+    setState(() {
+      // 현재 스케일을 기반으로 슬라이더의 값을 계산합니다.
+      // 계산된 값이 범위를 벗어나지 않도록 clamp 함수를 사용합니다.
+      _currentScale =
+          ((scale - _minScale) / (_maxScale - _minScale)).clamp(0.0, 1.0);
+    });
+  }
+
+  Widget _buildZoomSlider() {
+    return Positioned(
+      left: 32,
+      top: (MediaQuery.of(context).size.height - 320) / 2,
+      child: Container(
+        width: 48,
+        height: 320,
+        child: RotatedBox(
+          quarterTurns: 3,
+          child: Slider(
+            value: _currentScale, // 슬라이더 값이 항상 0.0과 1.0 사이가 되도록 합니다.
+            min: 0,
+            max: 1,
+            divisions: 20, // 선택적으로 사용하여 눈금을 표시합니다.
+            onChanged: (newValue) {
+              // 슬라이더의 새 값에 따라 스케일을 계산합니다.
+              double newScale = newValue * (_maxScale - _minScale) + _minScale;
+
+              // 화면의 중앙 좌표를 계산합니다.
+              final screenCenterX = MediaQuery.of(context).size.width / 2;
+              final screenCenterY = MediaQuery.of(context).size.height / 2;
+
+              // 새로운 변환 행렬을 계산합니다.
+              // 화면 중앙을 기준으로 스케일을 적용합니다.
+              Matrix4 newMatrix = Matrix4.identity()
+                ..translate(
+                  -screenCenterX * (newScale - 1),
+                  -screenCenterY * (newScale - 1),
+                )
+                ..scale(newScale);
+
+              // 변환 컨트롤러의 값을 업데이트합니다.
+              _transformationController.value = newMatrix;
+
+              // 현재 스케일 상태를 업데이트합니다.
+              setState(() {
+                _currentScale = newValue;
+              });
+            },
+            activeColor: Theme.of(context).primaryColor,
+            inactiveColor: Theme.of(context).primaryColor.withOpacity(0.2),
           ),
         ),
       ),
