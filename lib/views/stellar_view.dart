@@ -198,10 +198,7 @@ class _StellarViewState extends State<StellarView>
         if (mode == Mode.add) {
           setState(() {
             Star newStar = Star(pos: details.localPosition)
-              ..post = Post(
-                title: "Title Here",
-                markdownContent: "Content Here",
-              )
+              ..post = Post(title: 'New Star')
               ..planets = []
               ..planetAnimation = AnimationController(vsync: this);
 
@@ -401,7 +398,9 @@ class _StellarViewState extends State<StellarView>
   }
 
   List<Widget> _buildTexts(List<Node> nodes) {
-    return nodes.where((node) => node is Star && node.showStar && !node.isDeleting).map((node) {
+    return nodes
+        .where((node) => node is Star && node.showStar && !node.isDeleting)
+        .map((node) {
       return Positioned(
         left: node.pos.dx - textMaxWidth / 2,
         top: node.pos.dy + starSize / 2,
@@ -637,6 +636,11 @@ class _StellarViewState extends State<StellarView>
           if (other.pos.closeTo(node.pos, starAreaSize + starSize)) {
             final consO = (other as Star).constellation,
                 consN = node.constellation;
+
+            _hideOrbit(other);
+            node.pos = origin!.pos;
+            node.showStar = true;
+
             if (consO != null && consN != null && consO != consN) {
               break;
             }
@@ -656,10 +660,6 @@ class _StellarViewState extends State<StellarView>
             }
             graph.addEdge(other, node);
 
-            _hideOrbit(other);
-            node.pos = origin!.pos;
-            node.showStar = true;
-
             break;
           }
           if (other.pos.closeTo(node.pos, starOrbitSize + starSize)) {
@@ -669,6 +669,7 @@ class _StellarViewState extends State<StellarView>
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
               graph.removeNode(node);
+              node.showStar = true;
             }
             break;
           }
@@ -694,6 +695,10 @@ class _StellarViewState extends State<StellarView>
       originEdge!.end = tempPlanet!;
       node.showStar = false;
       _hideOrbit(node);
+    } else if (!node.canBePlanet) {
+      originEdge!.end = node;
+      node.showStar = true;
+      _showOrbit(node);
     }
   }
 

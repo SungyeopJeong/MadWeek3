@@ -11,7 +11,10 @@ class Graph {
   }
 
   void addEdge(Node node1, Node node2) {
-    edges.add(Edge(node1, node2));
+    final edge = Edge(node1, node2);
+    if (!edges.contains(edge)) {
+      edges.add(edge);
+    }
   }
 
   void removeNode(Node node) {

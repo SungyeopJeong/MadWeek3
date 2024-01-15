@@ -55,7 +55,9 @@ class Star extends Node {
   });
 
   void addPlanet(Planet planet) {
-    planets.add(planet..id = _newId++);
+    planets.add(planet
+      ..id = _newId++
+      ..post = Post(title: 'New Planet'));
   }
 }
 
