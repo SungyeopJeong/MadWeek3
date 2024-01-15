@@ -517,6 +517,20 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  void _showOrbit(Star star) {
+    star.showOrbit = true;
+    if (!star.planetAnimation.isAnimating) {
+      star.planetAnimation.repeat(period: Duration(seconds: 10));
+    }
+  }
+
+  void _hideOrbit(Star star) {
+    star.showOrbit = false;
+    if (star.planetAnimation.isAnimating) {
+      star.planetAnimation.reset();
+    }
+  }
+
   void _setOnPanStart(Node node) {
     isEditing = true;
     switch (node) {
@@ -543,15 +557,12 @@ class _StellarViewState extends State<StellarView>
           if (other == node) continue;
           if (other == origin && mode != Mode.add) continue;
           if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            (other as Star).showOrbit = false;
+            _hideOrbit(other as Star);
 
             if (other.planets.remove(tempPlanet)) {
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
               graph.removeNode(node);
-            }
-            if (other.planetAnimation.isAnimating) {
-              other.planetAnimation.reset();
             }
             break;
           }
@@ -573,26 +584,21 @@ class _StellarViewState extends State<StellarView>
           if (other == node) continue;
           if (other == origin && mode != Mode.add) continue;
           if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            (other as Star).showOrbit = true;
+            _showOrbit(other as Star);
+
             if (tempPlanet == null) {
               tempPlanet = Planet(star: other, showArea: true)..id = 0;
               other.planets.add(tempPlanet!);
               originEdge!.end = tempPlanet!;
               node.showStar = false;
             }
-            if (!other.planetAnimation.isAnimating) {
-              other.planetAnimation.repeat(period: Duration(seconds: 10));
-            }
           } else {
-            (other as Star).showOrbit = false;
+            _hideOrbit(other as Star);
 
             if (other.planets.remove(tempPlanet)) {
               tempPlanet = null;
               originEdge!.end = node;
               node.showStar = true;
-            }
-            if (other.planetAnimation.isAnimating) {
-              other.planetAnimation.reset();
             }
           }
         }
@@ -641,13 +647,11 @@ class _StellarViewState extends State<StellarView>
           setState(() {
             // 새 노드를 선택합니다.
             if (selectedNode != star) {
-              selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
-              selectedNode?.planetAnimation.reset();
+              // 이전 선택된 노드의 orbit을 해제합니다.
+              if (selectedNode != null) _hideOrbit(selectedNode!);
 
               selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
-              selectedNode!.showOrbit = true;
-              selectedNode!.planetAnimation
-                  .repeat(period: Duration(seconds: 10));
+              _showOrbit(selectedNode!);
 
               // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
               context.read<NoteViewModel>().titleController.text =
