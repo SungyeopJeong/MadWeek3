@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
@@ -8,10 +7,10 @@ import 'package:week3/viewmodels/note_view_model.dart';
 class NoteView extends StatefulWidget {
   const NoteView({
     super.key,
-    required this.star,
+    required this.node,
     required this.onClose,
   });
-  final Star star;
+  final Node node;
   final void Function() onClose;
 
   @override
@@ -30,8 +29,8 @@ class _NoteViewState extends State<NoteView> {
     // initState에서 NoteViewModel의 참조를 저장합니다.
     // Provider.of를 사용하여 context에 안전하게 접근
     noteViewModel = Provider.of<NoteViewModel>(context, listen: false);
-    noteViewModel.titleController.text = widget.star.post.title;
-    noteViewModel.contentController.text = widget.star.post.markdownContent;
+    noteViewModel.titleController.text = widget.node.post.title;
+    noteViewModel.contentController.text = widget.node.post.markdownContent;
   }
 
   @override
@@ -130,7 +129,9 @@ class _NoteViewState extends State<NoteView> {
           onPressed: () {
             setState(() {
               _enterViewMode();
-              widget.star.showOrbit = false;
+              if (widget.node is Star) {
+                (widget.node as Star).showOrbit = false;
+              }
               widget.onClose();
             });
           },
@@ -151,7 +152,7 @@ class _NoteViewState extends State<NoteView> {
               border: InputBorder.none,
             ),
             onChanged: (value) {
-              widget.star.post.title = value;
+              widget.node.post.title = value;
             },
           )
         : GestureDetector(
@@ -178,14 +179,14 @@ class _NoteViewState extends State<NoteView> {
                 border: InputBorder.none,
               ),
               onChanged: (value) {
-                widget.star.post.markdownContent = value;
+                widget.node.post.markdownContent = value;
               },
             )
           : GestureDetector(
               onTap: _enterEditMode,
               child: MarkdownBody(
                 softLineBreak: true,
-                data: widget.star.post.markdownContent,
+                data: widget.node.post.markdownContent,
                 styleSheet: MarkdownStyleSheet.fromTheme(
                   Theme.of(context),
                 ).copyWith(
@@ -208,7 +209,7 @@ class _NoteViewState extends State<NoteView> {
         border: InputBorder.none,
       ),
       onChanged: (value) {
-        widget.star.post.title = value;
+        widget.node.post.title = value;
       },
     );
   }
@@ -223,7 +224,7 @@ class _NoteViewState extends State<NoteView> {
         border: InputBorder.none,
       ),
       onChanged: (value) {
-        widget.star.post.markdownContent = value;
+        widget.node.post.markdownContent = value;
       },
     );
   }
