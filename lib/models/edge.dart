@@ -2,8 +2,9 @@ import 'package:week3/models/node.dart';
 
 class Edge {
   Node start, end;
+  Constellation? constellation;
 
-  Edge(this.start, this.end);
+  Edge(this.start, this.end, {this.constellation});
 
   @override
   bool operator ==(Object other) {

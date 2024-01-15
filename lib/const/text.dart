@@ -6,6 +6,11 @@ class MyText {
     leadingDistribution: TextLeadingDistribution.even,
   );
 
+  static final tinyRegular = regularBase.copyWith(
+    fontSize: 10.0,
+    height: 1.4,
+  );
+
   static final labelRegular = regularBase.copyWith(
     fontSize: 12.0,
     height: 1.4,
