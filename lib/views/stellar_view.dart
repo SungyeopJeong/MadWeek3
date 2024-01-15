@@ -399,7 +399,13 @@ class _StellarViewState extends State<StellarView>
   }
 
   List<Widget> _buildNodes(List<Node> nodes) {
-    return nodes.where((node) => node is! Planet).map((node) {
+    final sortedNodes = nodes.where((node) => node is! Planet).toList()
+      ..sort((a, b) => (a is Constellation)
+          ? (b is Constellation)
+              ? 0
+              : 1
+          : -1);
+    return sortedNodes.map((node) {
       switch (node) {
         case Star():
           return _buildStar(node);
@@ -952,63 +958,6 @@ class _StellarViewState extends State<StellarView>
         child: _buildEmptyStar(star),
       ),
     );
-    /*GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            origin!.showStar = false;
-            node.showStar = true;
-
-            void updateState(Node? other) {
-              if (other == node || other == null) return;
-              final distanceSquared = (other.pos - node.pos).distanceSquared;
-              double radiusSquared(double diameter) => diameter * diameter / 4;
-              if (distanceSquared <= radiusSquared(areaSize)) {
-                final edge = Edge(origin!, other);
-                if (!edges.any((element) => element == edge)) {
-                  origin!.showStar = true;
-                  originEdge = edge;
-                  node.showStar = false;
-                }
-                return;
-              }
-              if (distanceSquared <= radiusSquared(orbitSize)) {
-                other.showOrbit = true;
-                if (!other.planetAnimation.isAnimating) {
-                  other.planetAnimation.repeat();
-                }
-              } else {
-                other.showOrbit = false;
-                if (other.planetAnimation.isAnimating) {
-                  other.planetAnimation.reset();
-                }
-              }
-            }
-
-            for (final other in nodes) {
-              updateState(other);
-            }
-            if (mode == Mode.add) {
-              updateState(origin);
-            }
-          });
-        },
-        onPanEnd: (details) {
-          setState(() {
-            for (final node in nodes) {
-              node.showOrbit = false;
-            }
-
-            if (origin?.showStar ?? false) {
-              node.pos = origin!.pos;
-              node.showStar = true;
-              originEdge!.node1 = node;
-              if (!edges.contains(originEdge)) {
-                edges.add(originEdge!);
-              }
-            }
-          });
-        },
-      )*/
   }
 
   Widget _buildOrigin(Node node) {
