@@ -29,8 +29,8 @@ class _NoteViewState extends State<NoteView> {
     // initState에서 NoteViewModel의 참조를 저장합니다.
     // Provider.of를 사용하여 context에 안전하게 접근
     noteViewModel = Provider.of<NoteViewModel>(context, listen: false);
-    noteViewModel.titleController.text = widget.star.post.title;
-    noteViewModel.contentController.text = widget.star.post.markdownContent;
+    noteViewModel.titleController.text = widget.node.post.title;
+    noteViewModel.contentController.text = widget.node.post.markdownContent;
   }
 
   @override
@@ -152,7 +152,7 @@ class _NoteViewState extends State<NoteView> {
               border: InputBorder.none,
             ),
             onChanged: (value) {
-              widget.star.post.title = value;
+              widget.node.post.title = value;
             },
           )
         : GestureDetector(
@@ -179,7 +179,7 @@ class _NoteViewState extends State<NoteView> {
                 border: InputBorder.none,
               ),
               onChanged: (value) {
-                widget.star.post.markdownContent = value;
+                widget.node.post.markdownContent = value;
               },
             )
           : GestureDetector(
