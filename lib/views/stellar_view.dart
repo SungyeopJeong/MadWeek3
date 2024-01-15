@@ -167,13 +167,14 @@ class _StellarViewState extends State<StellarView>
 
             mode = Mode.none;
           });
-        } else if (selectedNode != null) {
+        }
+        /*if (selectedNode != null) {
           setState(() {
             selectedNode?.showOrbit = false;
             selectedNode?.planetAnimation.reset();
             selectedNode = null;
           });
-        }
+        }*/
       },
       onSecondaryTap: () {
         // 마우스 오른쪽 클릭 이벤트 처리
@@ -447,14 +448,58 @@ class _StellarViewState extends State<StellarView>
     final bool visible;
     if (!star.showStar) {
       visible = false;
-    } else if (star.showOrbit) {
+    } /*else if (star.showOrbit) {
       visible = true;
-    } else {
+    }*/
+    else {
       visible = star.showArea;
     }
-    return _buildColoredCircle(
-      starAreaSize,
-      visible ? MyColor.starArea : Colors.transparent,
+    return GestureDetector(
+      onPanStart: (details) {
+        setState(() {
+          _setOnPanStart(star);
+        });
+      },
+      onPanUpdate: (details) {
+        if (star.showArea) {
+          // star following cursor if area shown(interactive)
+          setState(() {
+            star.pos += details.delta;
+
+            _caseProcess(star);
+          });
+        }
+      },
+      onPanEnd: (_) {
+        setState(() {
+          _setOnPanEnd(star);
+          star.isDeleting = isBlackholeEnabled;
+        });
+      },
+      onTap: () {
+        setState(() {
+          // 새 노드를 선택합니다.
+          if (selectedNode != star) {
+            // 이전 선택된 노드의 orbit을 해제합니다.
+            if (selectedNode != null) _hideOrbit(selectedNode!);
+
+            selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
+            _showOrbit(selectedNode!);
+
+            // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+            context.read<NoteViewModel>().titleController.text =
+                selectedNode!.post.title;
+            context.read<NoteViewModel>().contentController.text =
+                selectedNode!.post.markdownContent;
+
+            _focusOnNode(star); // 뷰포트 이동
+          }
+        });
+      },
+      child: _buildColoredCircle(
+        starAreaSize,
+        visible ? MyColor.starArea : Colors.transparent,
+      ),
     );
   }
 
@@ -511,8 +556,8 @@ class _StellarViewState extends State<StellarView>
       starTotalSize,
       [
         _buildStarOrbit(star),
-        _buildStarArea(star),
         _buildStarCenter(star),
+        _buildStarArea(star),
       ],
     );
   }
@@ -621,60 +666,17 @@ class _StellarViewState extends State<StellarView>
     return Positioned(
       left: star.pos.dx - starTotalSize / 2,
       top: star.pos.dy - starTotalSize / 2,
-      child: GestureDetector(
-        onPanStart: (details) {
+      child: MouseRegion(
+        onHover: (details) {
           setState(() {
-            _setOnPanStart(star);
+            // show area if mouse in area
+            star.showArea = details.localPosition.closeTo(
+              OffsetExt.center(starTotalSize),
+              starAreaSize,
+            );
           });
         },
-        onPanUpdate: (details) {
-          if (star.showArea) {
-            // star following cursor if area shown(interactive)
-            setState(() {
-              star.pos += details.delta;
-
-              _caseProcess(star);
-            });
-          }
-        },
-        onPanEnd: (_) {
-          setState(() {
-            _setOnPanEnd(star);
-            star.isDeleting = isBlackholeEnabled;
-          });
-        },
-        onTap: () {
-          setState(() {
-            // 새 노드를 선택합니다.
-            if (selectedNode != star) {
-              // 이전 선택된 노드의 orbit을 해제합니다.
-              if (selectedNode != null) _hideOrbit(selectedNode!);
-
-              selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
-              _showOrbit(selectedNode!);
-
-              // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
-              context.read<NoteViewModel>().titleController.text =
-                  selectedNode!.post.title;
-              context.read<NoteViewModel>().contentController.text =
-                  selectedNode!.post.markdownContent;
-
-              _focusOnNode(star); // 뷰포트 이동
-            }
-          });
-        },
-        child: MouseRegion(
-          onHover: (details) {
-            setState(() {
-              // show area if mouse in area
-              star.showArea = details.localPosition.closeTo(
-                OffsetExt.center(starTotalSize),
-                starAreaSize,
-              );
-            });
-          },
-          child: _buildEmptyStar(star),
-        ),
+        child: _buildEmptyStar(star),
       ),
     );
     /*GestureDetector(
