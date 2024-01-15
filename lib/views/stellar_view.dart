@@ -51,6 +51,12 @@ class _StellarViewState extends State<StellarView>
 
   final _exception = Exception('Unable to classify');
 
+  bool isMenuVisible = false;
+  late AnimationController _menuAnimationController;
+  late Animation<Offset> _menuSlideAnimation;
+  // 메뉴 호버링 상태를 추적하는 변수 추가
+  bool _menuHovering = false;
+
   @override
   void initState() {
     super.initState();
@@ -65,6 +71,20 @@ class _StellarViewState extends State<StellarView>
     _currentScale =
         (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
             (_maxScale - _minScale);
+
+    // 메뉴 애니메이션 컨트롤러 초기화
+    _menuAnimationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 250), // 메뉴가 나오는 데 걸리는 시간
+    );
+    // 메뉴 슬라이드 애니메이션 정의
+    _menuSlideAnimation = Tween<Offset>(
+      begin: Offset(-1, 0), // 메뉴가 왼쪽에서 시작
+      end: Offset(0, 0), // 메뉴가 화면에 완전히 나옴
+    ).animate(CurvedAnimation(
+      parent: _menuAnimationController,
+      curve: Curves.easeInOut,
+    ));
   }
 
   @override
@@ -72,6 +92,9 @@ class _StellarViewState extends State<StellarView>
     _transformationController.removeListener(_updateZoomSlider);
     // AnimationController 정리
     _animationController.dispose();
+
+    // 컨트롤러 정리
+    _menuAnimationController.dispose();
     super.dispose();
   }
 
@@ -113,6 +136,7 @@ class _StellarViewState extends State<StellarView>
                 });
               },
             ),
+          _buildHoverableMenu()
         ],
       ),
       floatingActionButton: _buildFAB(),
@@ -124,19 +148,25 @@ class _StellarViewState extends State<StellarView>
       onTapDown: (details) {
         if (mode == Mode.add) {
           setState(() {
-            graph.addNode(
-              Star(pos: details.localPosition)
-                ..post = Post(
-                  title: "Title Here",
-                  markdownContent: "Content Here",
-                )
-                ..planets = []
-                ..planetAnimation = AnimationController(vsync: this),
-            );
+            Star newStar = Star(pos: details.localPosition)
+              ..post = Post(
+                title: "Title Here",
+                markdownContent: "Content Here",
+              );
+
+            graph.addNode(newStar
+              ..planets = []
+              ..planetAnimation = AnimationController(vsync: this));
+
+            _focusOnNode(newStar);
+            selectedNode = newStar;
+
+            selectedNode!.showOrbit = true;
+            selectedNode!.planetAnimation.repeat(period: Duration(seconds: 10));
+
             mode = Mode.none;
           });
-        }
-        if (selectedNode != null) {
+        } else if (selectedNode != null) {
           setState(() {
             selectedNode?.showOrbit = false;
             selectedNode?.planetAnimation.reset();
@@ -172,6 +202,94 @@ class _StellarViewState extends State<StellarView>
           ),
         ),
       ),
+    );
+  }
+
+  // 디렉토리 표시될 사이드바
+  // 메뉴버튼 호버링으로 열고 사이드바 바깥 영역으로 마우스를 이동시켜 닫기
+  Widget _buildHoverableMenu() {
+    return Stack(
+      children: [
+        Positioned(
+          left: 32,
+          top: 32,
+          child: MouseRegion(
+            onEnter: (event) => _menuAnimationController.forward(),
+            child: FloatingActionButton(
+              onPressed: () {
+                // 버튼 클릭 이벤트: 사이드바를 토글
+                isMenuVisible = !isMenuVisible;
+                isMenuVisible
+                    ? _menuAnimationController.forward()
+                    : _menuAnimationController.reverse();
+              },
+              child: Icon(Icons.menu),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 32,
+          bottom: 32,
+          left: 0,
+          child: SlideTransition(
+            position: _menuSlideAnimation,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: MouseRegion(
+                onEnter: (event) => setState(() => _menuHovering = true),
+                onExit: (event) => setState(() {
+                  if (_menuHovering) {
+                    _menuAnimationController.reverse();
+                    _menuHovering = false;
+                    isMenuVisible = false;
+                  }
+                }),
+                child: Container(
+                  width: 240, // 고정 너비
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850], // 사이드바의 배경색
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(12), // 오른쪽 상단 모서리 둥글게
+                      bottomRight: Radius.circular(12), // 오른쪽 하단 모서리 둥글게
+                    ),
+                  ),
+                  child: _buildNodeList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 사이드바에서 보여줄 노드 리스트 만들기
+  Widget _buildNodeList() {
+    List<Node> nodes = graph.nodes;
+
+    return ListView.builder(
+      itemCount: nodes.length,
+      itemBuilder: (context, index) {
+        Node node = nodes[index];
+        return ListTile(
+          title: Text(
+            node.post.title,
+            style: TextStyle(color: Colors.white),
+          ),
+          onTap: () {
+            // 탭한 노드를 selectedNode에 할당
+            setState(() {
+              selectedNode = node as Star;
+              selectedNode!.showOrbit = true;
+              selectedNode!.planetAnimation
+                  .repeat(period: Duration(seconds: 10));
+            });
+
+            // 해당 노드에 포커스
+            _focusOnNode(node);
+          },
+        );
+      },
     );
   }
 
@@ -722,7 +840,7 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
-  // 슬라이더를 위치시키고 상태를 업데이트
+  // 슬라이더를 위치시키고 상태를 업데이트      << 얘를 바꿔야 슬라이드바 줌 문제 해결됨
   Widget _customSlider(BuildContext context) {
     return Slider(
       value: _currentScale,
@@ -756,7 +874,7 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
-  // 주어진 노드가 화면 가로 1/4 지점에 오도록 화면을 이동시키는 함수
+  // 주어진 노드가 화면 가로 1/3 지점에 오도록 화면을 이동시키는 함수
   void _focusOnNode(Node node) {
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
@@ -764,7 +882,7 @@ class _StellarViewState extends State<StellarView>
     final Matrix4 endMatrix = Matrix4.identity()
       ..scale(3.0)
       ..translate(
-        -node.pos.dx + MediaQuery.of(context).size.width / 4 / 3,
+        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 3,
         -node.pos.dy + MediaQuery.of(context).size.height / 2 / 3,
       );
 
