@@ -444,6 +444,98 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  void _showOrbit(Star star) {
+    star.showOrbit = true;
+    if (!star.planetAnimation.isAnimating) {
+      star.planetAnimation.repeat(period: Duration(seconds: 10));
+    }
+  }
+
+  void _hideOrbit(Star star) {
+    star.showOrbit = false;
+    if (star.planetAnimation.isAnimating) {
+      star.planetAnimation.reset();
+    }
+  }
+
+  void _setOnPanStart(Node node) {
+    isEditing = true;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        origin = Star(pos: node.pos)
+          ..id = 0
+          ..planets = []
+          ..planetAnimation = AnimationController(vsync: this);
+        originEdge = Edge(origin!, node);
+      default:
+        throw _exception;
+    }
+  }
+
+  void _setOnPanEnd(Node node) {
+    isEditing = false;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            _hideOrbit(other as Star);
+
+            if (other.planets.remove(tempPlanet)) {
+              other.addPlanet(Planet(star: other));
+              tempPlanet = null;
+              graph.removeNode(node);
+            }
+            break;
+          }
+        }
+
+        originEdge = null;
+        origin = null;
+      default:
+        throw _exception;
+    }
+  }
+
+  void _caseProcess(Node node) {
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            _showOrbit(other as Star);
+            other.showArea = true;
+
+            if (tempPlanet == null) {
+              tempPlanet = Planet(star: other, showArea: true)..id = 0;
+              other.planets.add(tempPlanet!);
+              originEdge!.end = tempPlanet!;
+              node.showStar = false;
+            }
+          } else {
+            _hideOrbit(other as Star);
+            other.showArea = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              tempPlanet = null;
+              originEdge!.end = node;
+              node.showStar = true;
+            }
+          }
+        }
+      default:
+        throw _exception;
+    }
+  }
+
   Widget _buildStarArea(Star star) {
     final bool visible;
     if (!star.showStar) {
@@ -560,96 +652,6 @@ class _StellarViewState extends State<StellarView>
         _buildStarArea(star),
       ],
     );
-  }
-
-  void _showOrbit(Star star) {
-    star.showOrbit = true;
-    if (!star.planetAnimation.isAnimating) {
-      star.planetAnimation.repeat(period: Duration(seconds: 10));
-    }
-  }
-
-  void _hideOrbit(Star star) {
-    star.showOrbit = false;
-    if (star.planetAnimation.isAnimating) {
-      star.planetAnimation.reset();
-    }
-  }
-
-  void _setOnPanStart(Node node) {
-    isEditing = true;
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        origin = Star(pos: node.pos)
-          ..id = 0
-          ..planets = []
-          ..planetAnimation = AnimationController(vsync: this);
-        originEdge = Edge(origin!, node);
-      default:
-        throw _exception;
-    }
-  }
-
-  void _setOnPanEnd(Node node) {
-    isEditing = false;
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        for (final other in graph.nodes + [origin!]) {
-          if (other == node) continue;
-          if (other == origin && mode != Mode.add) continue;
-          if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            _hideOrbit(other as Star);
-
-            if (other.planets.remove(tempPlanet)) {
-              other.addPlanet(Planet(star: other));
-              tempPlanet = null;
-              graph.removeNode(node);
-            }
-            break;
-          }
-        }
-
-        originEdge = null;
-        origin = null;
-      default:
-        throw _exception;
-    }
-  }
-
-  void _caseProcess(Node node) {
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        for (final other in graph.nodes + [origin!]) {
-          if (other == node) continue;
-          if (other == origin && mode != Mode.add) continue;
-          if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            _showOrbit(other as Star);
-
-            if (tempPlanet == null) {
-              tempPlanet = Planet(star: other, showArea: true)..id = 0;
-              other.planets.add(tempPlanet!);
-              originEdge!.end = tempPlanet!;
-              node.showStar = false;
-            }
-          } else {
-            _hideOrbit(other as Star);
-
-            if (other.planets.remove(tempPlanet)) {
-              tempPlanet = null;
-              originEdge!.end = node;
-              node.showStar = true;
-            }
-          }
-        }
-      default:
-        throw _exception;
-    }
   }
 
   Widget _buildStar(Star star) {
@@ -894,6 +896,8 @@ class _StellarViewState extends State<StellarView>
 
   // 주어진 노드가 화면 가로 1/3 지점에 오도록 화면을 이동시키는 함수
   void _focusOnNode(Node node) {
+    (node as Star).showArea = false;
+
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
     // 최종 행렬
