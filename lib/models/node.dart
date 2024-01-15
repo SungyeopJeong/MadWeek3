@@ -63,6 +63,6 @@ class Constellation extends Node {
   late List<Star> stars;
 
   Constellation({
-    required super.pos,
+    super.pos = Offset.zero,
   });
 }

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:week3/const/color.dart';
 import 'package:week3/const/size.dart';
+import 'package:week3/const/text.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/extensions/offset.dart';
 import 'package:week3/models/graph.dart';
@@ -34,7 +35,7 @@ class _StellarViewState extends State<StellarView>
   bool isEditing = false;
 
   bool get isStarSelected => selectedNode != null; // 별이 선택되었는지 여부를 추적하는 변수
-  Star? selectedNode; // 선택된 노드 추적
+  Node? selectedNode; // 선택된 노드 추적
 
   // 뷰를 이동시키기 위한 Controller
   final TransformationController _transformationController =
@@ -131,7 +132,7 @@ class _StellarViewState extends State<StellarView>
           ),
           if (isStarSelected)
             NoteView(
-              star: selectedNode!,
+              node: selectedNode!,
               onClose: () {
                 setState(() {
                   selectedNode = null;
@@ -162,11 +163,15 @@ class _StellarViewState extends State<StellarView>
 
             _focusOnNode(newStar);
 
-            if (selectedNode != null) _hideOrbit(selectedNode!);
+            if (selectedNode != null && selectedNode is Star) {
+              _hideOrbit(selectedNode as Star);
+            }
             selectedNode = newStar;
 
-            selectedNode!.showOrbit = true;
-            selectedNode!.planetAnimation.repeat(period: Duration(seconds: 10));
+            (selectedNode as Star).showOrbit = true;
+            (selectedNode as Star)
+                .planetAnimation
+                .repeat(period: Duration(seconds: 10));
 
             mode = Mode.none;
             try {
@@ -287,10 +292,10 @@ class _StellarViewState extends State<StellarView>
           onTap: () {
             // 탭한 노드를 selectedNode에 할당
             setState(() {
-              selectedNode = node as Star;
-              selectedNode!.showOrbit = true;
-              selectedNode!.planetAnimation
-                  .repeat(period: Duration(seconds: 10));
+              selectedNode = node;
+              if (selectedNode is Star) {
+                _showOrbit(selectedNode as Star);
+              }
             });
 
             // 해당 노드에 포커스
@@ -560,7 +565,35 @@ class _StellarViewState extends State<StellarView>
         for (final other in graph.nodes + [origin!]) {
           if (other == node) continue;
           if (other == origin && mode != Mode.add) continue;
-          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+          if (other.pos.closeTo(node.pos, starAreaSize + starSize)) {
+            final consO = (other as Star).constellation,
+                consN = node.constellation;
+            if (consO != null && consN != null && consO != consN) {
+              break;
+            }
+            if (consO == null && consN == null) {
+              final newConstellation = Constellation()
+                ..stars = [other, node]
+                ..post = Post(title: 'New Constellation');
+              graph.addNode(newConstellation);
+              other.constellation = newConstellation;
+              node.constellation = newConstellation;
+            } else if (consO == null) {
+              node.constellation!.stars.add(other);
+              other.constellation = node.constellation;
+            } else if (consN == null) {
+              other.constellation!.stars.add(node);
+              node.constellation = other.constellation;
+            }
+            graph.addEdge(other, node);
+
+            _hideOrbit(other);
+            node.pos = origin!.pos;
+            node.showStar = true;
+
+            break;
+          }
+          if (other.pos.closeTo(node.pos, starOrbitSize + starSize)) {
             _hideOrbit(other as Star);
 
             if (other.planets.remove(tempPlanet)) {
@@ -641,6 +674,29 @@ class _StellarViewState extends State<StellarView>
     }
   }
 
+  void _openNote(Node node) {
+    setState(() {
+      // 새 노드를 선택합니다.
+      if (selectedNode != node) {
+        // 이전 선택된 노드의 orbit을 해제합니다.
+        if (selectedNode != null && selectedNode is Star) {
+          _hideOrbit(selectedNode as Star);
+        }
+
+        selectedNode = node; // 새로운 노드를 선택된 노드로 설정합니다.
+        if (selectedNode is Star) _showOrbit(selectedNode as Star);
+
+        // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+        context.read<NoteViewModel>().titleController.text =
+            selectedNode!.post.title;
+        context.read<NoteViewModel>().contentController.text =
+            selectedNode!.post.markdownContent;
+
+        _focusOnNode(node); // 뷰포트 이동
+      }
+    });
+  }
+
   Widget _buildStarArea(Star star) {
     final bool visible;
     if (!star.showStar) {
@@ -675,26 +731,7 @@ class _StellarViewState extends State<StellarView>
           star.isDeleting = isBlackholeEnabled;
         });
       },
-      onTap: () {
-        setState(() {
-          // 새 노드를 선택합니다.
-          if (selectedNode != star) {
-            // 이전 선택된 노드의 orbit을 해제합니다.
-            if (selectedNode != null) _hideOrbit(selectedNode!);
-
-            selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
-            _showOrbit(selectedNode!);
-
-            // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
-            context.read<NoteViewModel>().titleController.text =
-                selectedNode!.post.title;
-            context.read<NoteViewModel>().contentController.text =
-                selectedNode!.post.markdownContent;
-
-            _focusOnNode(star); // 뷰포트 이동
-          }
-        });
-      },
+      onTap: () => _openNote(star),
       child: _buildColoredCircle(
         starAreaSize,
         visible ? MyColor.starArea : Colors.transparent,
@@ -869,7 +906,27 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildConstellation(Constellation constellation) {
-    return Placeholder();
+    final center =
+        constellation.stars.fold(Offset.zero, (prev, star) => prev + star.pos) /
+            constellation.stars.length.toDouble();
+    constellation.pos = center;
+    return Positioned(
+      left: center.dx - 160,
+      top: center.dy,
+      child: GestureDetector(
+        onTap: () => _openNote(constellation),
+        child: Container(
+          width: 320,
+          alignment: Alignment.center,
+          child: Text(
+            constellation.post.title,
+            style: MyText.displayRegular,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildBlackhole() {
@@ -998,7 +1055,7 @@ class _StellarViewState extends State<StellarView>
 
   // 주어진 노드가 화면 가로 1/3 지점에 오도록 화면을 이동시키는 함수
   void _focusOnNode(Node node) {
-    (node as Star).showArea = false;
+    if (node is Star) node.showArea = false;
 
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
