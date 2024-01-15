@@ -45,9 +45,9 @@ class _StellarViewState extends State<StellarView>
   late Animation<Matrix4> _animation;
 
   // 뷰의 최소 / 최대 배율, 현재 배율 저장 변수
-  final double _minScale = 1.0;
+  final double _minScale = 0.5;
   final double _maxScale = 4.0;
-  double _currentScale = 1.0;
+  late double _currentScale;
 
   final _exception = Exception('Unable to classify');
 
@@ -101,6 +101,7 @@ class _StellarViewState extends State<StellarView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: MyColor.bg,
       body: Stack(
         children: [
           CallbackShortcuts(
@@ -119,6 +120,7 @@ class _StellarViewState extends State<StellarView>
                     minScale: _minScale,
                     maxScale: _maxScale,
                     transformationController: _transformationController,
+                    constrained: false,
                     child: _buildBody(),
                   ),
                   _buildBlackhole(),
@@ -152,11 +154,11 @@ class _StellarViewState extends State<StellarView>
               ..post = Post(
                 title: "Title Here",
                 markdownContent: "Content Here",
-              );
-
-            graph.addNode(newStar
+              )
               ..planets = []
-              ..planetAnimation = AnimationController(vsync: this));
+              ..planetAnimation = AnimationController(vsync: this);
+
+            graph.addNode(newStar);
 
             _focusOnNode(newStar);
             selectedNode = newStar;
@@ -165,14 +167,18 @@ class _StellarViewState extends State<StellarView>
             selectedNode!.planetAnimation.repeat(period: Duration(seconds: 10));
 
             mode = Mode.none;
+            try {
+              _push(newStar);
+            } catch (_) {}
           });
-        } else if (selectedNode != null) {
+        }
+        /*if (selectedNode != null) {
           setState(() {
             selectedNode?.showOrbit = false;
             selectedNode?.planetAnimation.reset();
             selectedNode = null;
           });
-        }
+        }*/
       },
       onSecondaryTap: () {
         // 마우스 오른쪽 클릭 이벤트 처리
@@ -185,8 +191,8 @@ class _StellarViewState extends State<StellarView>
             mode == Mode.add ? SystemMouseCursors.precise : MouseCursor.defer,
         child: Container(
           color: MyColor.bg,
-          width: double.maxFinite,
-          height: double.maxFinite,
+          width: MediaQuery.of(context).size.width * 2,
+          height: MediaQuery.of(context).size.height * 2,
           child: Stack(
             children: [
               CustomPaint(
@@ -432,6 +438,74 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  void _push(Node node) {
+    const spare = 5.0;
+    const radius = (starTotalSize + spare) / 2;
+    bool changed = false;
+    final width = MediaQuery.of(context).size.width * 2;
+    final height = MediaQuery.of(context).size.height * 2;
+
+    for (final other in graph.nodes) {
+      if (other == node || other is! Star) continue;
+      final curPos = (node as Star).pushedPos ?? node.pos;
+      final otherCurPos = other.pushedPos ?? other.pos;
+
+      if (otherCurPos.closeTo((curPos), 2 * starTotalSize)) {
+        final unitVector =
+            (otherCurPos - curPos) / (otherCurPos - curPos).distance;
+        other.pushedPos = curPos + unitVector * radius * 2;
+
+        if (!(other.pushedPos! >= Offset(radius, radius) &&
+            other.pushedPos! <= Offset(width - radius, height - radius))) {
+          other.pushedPos = Offset(
+              other.pushedPos!.dx.clamp(radius, width - radius),
+              other.pushedPos!.dy.clamp(radius, height - radius));
+
+          final error = (other.pushedPos!.dx != width / 2 &&
+                  other.pushedPos!.dy != height / 2)
+              ? spare
+              : 0;
+          final center = Offset(width / 2 + error, height / 2 + error);
+          final delta = (center - other.pushedPos!) /
+              (center - other.pushedPos!).distance *
+              5;
+          other.pushedPos = other.pushedPos! + delta;
+        }
+
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+
+    for (final other in graph.nodes) {
+      if (other == node || other is! Star) continue;
+      if (other.pushedPos != null) _push(other);
+    }
+  }
+
+  Widget _buildPushedStar(Star star) {
+    return TweenAnimationBuilder(
+      tween: Tween(
+        begin: star.pos,
+        end: star.pushedPos,
+      ),
+      curve: Curves.easeOutSine,
+      duration: Duration(milliseconds: 250),
+      onEnd: () {
+        setState(() {
+          star.pos = star.pushedPos!;
+          star.pushedPos = null;
+        });
+      },
+      builder: (_, val, __) => Positioned(
+        left: val.dx - starSize / 2,
+        top: val.dy - starSize / 2,
+        child: _buildStarCenter(star),
+      ),
+    );
+  }
+
   Widget _buildStarCenter(Star star) {
     return Visibility(
       visible: star.showStar,
@@ -442,14 +516,169 @@ class _StellarViewState extends State<StellarView>
     );
   }
 
+  void _showOrbit(Star star) {
+    star.showOrbit = true;
+    if (!star.planetAnimation.isAnimating) {
+      star.planetAnimation.repeat(period: Duration(seconds: 10));
+    }
+  }
+
+  void _hideOrbit(Star star) {
+    star.showOrbit = false;
+    if (star.planetAnimation.isAnimating) {
+      star.planetAnimation.reset();
+    }
+  }
+
+  void _setOnPanStart(Node node) {
+    isEditing = true;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        origin = Star(pos: node.pos)
+          ..id = 0
+          ..planets = []
+          ..planetAnimation = AnimationController(vsync: this);
+        originEdge = Edge(origin!, node);
+      default:
+        throw _exception;
+    }
+  }
+
+  void _setOnPanEnd(Node node) {
+    isEditing = false;
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            _hideOrbit(other as Star);
+
+            if (other.planets.remove(tempPlanet)) {
+              other.addPlanet(Planet(star: other));
+              tempPlanet = null;
+              graph.removeNode(node);
+            }
+            break;
+          }
+        }
+
+        originEdge = null;
+        origin = null;
+
+        try {
+          _push(node);
+        } catch (_) {}
+      default:
+        throw _exception;
+    }
+  }
+
+  void _caseProcess(Node node) {
+    switch (node) {
+      case Planet():
+        throw UnimplementedError();
+      case Star():
+        for (final other in graph.nodes + [origin!]) {
+          if (other == node) continue;
+          if (other == origin && mode != Mode.add) continue;
+          if (other.pos.closeTo(node.pos, starOrbitSize)) {
+            _showOrbit(other as Star);
+            other.showArea = true;
+
+            if (tempPlanet == null && node.canBePlanet) {
+              tempPlanet = Planet(star: other, showArea: true)..id = 0;
+              other.planets.add(tempPlanet!);
+              originEdge!.end = tempPlanet!;
+              node.showStar = false;
+              _hideOrbit(node);
+            }
+          } else {
+            if (selectedNode != other as Star) _hideOrbit(other);
+            other.showArea = false;
+
+            if (other.planets.remove(tempPlanet)) {
+              tempPlanet = null;
+              originEdge!.end = node;
+              node.showStar = true;
+              _showOrbit(node);
+            }
+          }
+        }
+      default:
+        throw _exception;
+    }
+  }
+
   Widget _buildStarArea(Star star) {
-    return Visibility(
-      visible: star.showOrbit ? true : star.showArea,
-      child: _buildColoredCircle(starAreaSize, MyColor.starArea),
+    final bool visible;
+    if (!star.showStar) {
+      visible = false;
+    } /*else if (star.showOrbit) {
+      visible = true;
+    }*/
+    else {
+      visible = star.showArea;
+    }
+    return GestureDetector(
+      onPanStart: (details) {
+        setState(() {
+          _setOnPanStart(star);
+          _showOrbit(star);
+        });
+      },
+      onPanUpdate: (details) {
+        if (star.showArea) {
+          // star following cursor if area shown(interactive)
+          setState(() {
+            star.pos += details.delta;
+
+            _caseProcess(star);
+          });
+        }
+      },
+      onPanEnd: (_) {
+        setState(() {
+          _setOnPanEnd(star);
+          _hideOrbit(star);
+          star.isDeleting = isBlackholeEnabled;
+        });
+      },
+      onTap: () {
+        setState(() {
+          // 새 노드를 선택합니다.
+          if (selectedNode != star) {
+            // 이전 선택된 노드의 orbit을 해제합니다.
+            if (selectedNode != null) _hideOrbit(selectedNode!);
+
+            selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
+            _showOrbit(selectedNode!);
+
+            // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+            context.read<NoteViewModel>().titleController.text =
+                selectedNode!.post.title;
+            context.read<NoteViewModel>().contentController.text =
+                selectedNode!.post.markdownContent;
+
+            _focusOnNode(star); // 뷰포트 이동
+          }
+        });
+      },
+      child: _buildColoredCircle(
+        starAreaSize,
+        visible ? MyColor.starArea : Colors.transparent,
+      ),
     );
   }
 
   Widget _buildStarOrbit(Star star) {
+    if (!star.showOrbit && selectedNode == star) {
+      _showOrbit(star);
+    }
     return Visibility(
       visible: star.showOrbit,
       child: _buildHelper(
@@ -502,91 +731,10 @@ class _StellarViewState extends State<StellarView>
       starTotalSize,
       [
         _buildStarOrbit(star),
-        _buildStarArea(star),
         _buildStarCenter(star),
+        _buildStarArea(star),
       ],
     );
-  }
-
-  void _setOnPanStart(Node node) {
-    isEditing = true;
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        origin = Star(pos: node.pos)
-          ..id = 0
-          ..planets = []
-          ..planetAnimation = AnimationController(vsync: this);
-        originEdge = Edge(origin!, node);
-      default:
-        throw _exception;
-    }
-  }
-
-  void _setOnPanEnd(Node node) {
-    isEditing = false;
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        for (final other in graph.nodes + [origin!]) {
-          if (other == node) continue;
-          if (other == origin && mode != Mode.add) continue;
-          if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            (other as Star).showOrbit = false;
-
-            if (other.planets.remove(tempPlanet)) {
-              other.addPlanet(Planet(star: other));
-              tempPlanet = null;
-            }
-            if (other.planetAnimation.isAnimating) {
-              other.planetAnimation.reset();
-            }
-            break;
-          }
-        }
-
-        originEdge = null;
-        origin = null;
-      default:
-        throw _exception;
-    }
-  }
-
-  void _caseProcess(Node node) {
-    switch (node) {
-      case Planet():
-        throw UnimplementedError();
-      case Star():
-        for (final other in graph.nodes + [origin!]) {
-          if (other == node) continue;
-          if (other == origin && mode != Mode.add) continue;
-          if (other.pos.closeTo(node.pos, starOrbitSize)) {
-            (other as Star).showOrbit = true;
-            if (tempPlanet == null) {
-              tempPlanet = Planet(star: other, showArea: true)..id = 0;
-              other.planets.add(tempPlanet!);
-              originEdge!.end = tempPlanet!;
-            }
-            if (!other.planetAnimation.isAnimating) {
-              other.planetAnimation.repeat(period: Duration(seconds: 10));
-            }
-          } else {
-            (other as Star).showOrbit = false;
-
-            if (other.planets.remove(tempPlanet)) {
-              tempPlanet = null;
-              originEdge!.end = node;
-            }
-            if (other.planetAnimation.isAnimating) {
-              other.planetAnimation.reset();
-            }
-          }
-        }
-      default:
-        throw _exception;
-    }
   }
 
   Widget _buildStar(Star star) {
@@ -600,79 +748,29 @@ class _StellarViewState extends State<StellarView>
         ),
       );
     }
+    if (star.pushedPos != null) {
+      return _buildPushedStar(star);
+    }
     return Positioned(
       left: star.pos.dx - starTotalSize / 2,
       top: star.pos.dy - starTotalSize / 2,
-      child: GestureDetector(
-        onPanStart: (details) {
+      child: MouseRegion(
+        onHover: (details) {
           setState(() {
-            _setOnPanStart(star);
+            // show area if mouse in area
+            star.showArea = details.localPosition.closeTo(
+              OffsetExt.center(starTotalSize),
+              starAreaSize,
+            );
           });
         },
-        onPanUpdate: (details) {
-          if (star.showArea) {
-            // star following cursor if area shown(interactive)
-            setState(() {
-              star.pos += details.delta;
-
-              _caseProcess(star);
-            });
-          }
-        },
-        onPanEnd: (_) {
-          setState(() {
-            _setOnPanEnd(star);
-            star.isDeleting = isBlackholeEnabled;
-          });
-        },
-        onTap: () {
-          setState(() {
-            // 새 노드를 선택합니다.
-            if (selectedNode != star) {
-              selectedNode?.showOrbit = false; // 이전 선택된 노드의 orbit을 해제합니다.
-              selectedNode?.planetAnimation.reset();
-
-              selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
-              selectedNode!.showOrbit = true;
-              selectedNode!.planetAnimation
-                  .repeat(period: Duration(seconds: 10));
-
-              // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
-              context.read<NoteViewModel>().titleController.text =
-                  selectedNode!.post.title;
-              context.read<NoteViewModel>().contentController.text =
-                  selectedNode!.post.markdownContent;
-
-              _focusOnNode(star); // 뷰포트 이동
-            }
-          });
-        },
-        child: MouseRegion(
-          onHover: (details) {
-            setState(() {
-              // show area if mouse in area
-              star.showArea = details.localPosition.closeTo(
-                OffsetExt.center(starTotalSize),
-                starAreaSize,
-              );
-            });
-          },
-          child: _buildEmptyStar(star),
-        ),
+        child: _buildEmptyStar(star),
       ),
     );
     /*GestureDetector(
         onPanUpdate: (details) {
           setState(() {
-            //원래자리에 노드 모양 위젯 생성
-            origin ??= Node(node.pos)
-              ..planetAnimation = AnimationController(
-                vsync: this,
-                upperBound: 2 * pi,
-                duration: Duration(seconds: 10),
-              );
             origin!.showStar = false;
-            originEdge = Edge(origin!, node);
             node.showStar = true;
 
             void updateState(Node? other) {
@@ -723,9 +821,6 @@ class _StellarViewState extends State<StellarView>
                 edges.add(originEdge!);
               }
             }
-
-            origin = null; // `origin`을 `null`로 설정
-            originEdge = null;
           });
         },
       )*/
@@ -876,6 +971,8 @@ class _StellarViewState extends State<StellarView>
 
   // 주어진 노드가 화면 가로 1/3 지점에 오도록 화면을 이동시키는 함수
   void _focusOnNode(Node node) {
+    (node as Star).showArea = false;
+
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
     // 최종 행렬

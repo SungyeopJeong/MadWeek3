@@ -38,9 +38,12 @@ class Star extends Node {
   Constellation? constellation;
   late List<Planet> planets;
   bool showStar, showArea, showOrbit, isDeleting;
+  Offset? pushedPos;
   late AnimationController planetAnimation;
 
   int _newId = 1;
+
+  bool get canBePlanet => planets.isEmpty;
 
   Star({
     required super.pos,
