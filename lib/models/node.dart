@@ -38,6 +38,7 @@ class Star extends Node {
   Constellation? constellation;
   late List<Planet> planets;
   bool showStar, showArea, showOrbit, isDeleting;
+  Offset? pushedPos;
   late AnimationController planetAnimation;
 
   int _newId = 1;
@@ -50,7 +51,7 @@ class Star extends Node {
     this.showStar = true,
     this.showArea = false,
     this.showOrbit = false,
-        this.isDeleting = false,
+    this.isDeleting = false,
   });
 
   void addPlanet(Planet planet) {
