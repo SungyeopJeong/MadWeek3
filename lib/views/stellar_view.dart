@@ -101,6 +101,7 @@ class _StellarViewState extends State<StellarView>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: MyColor.bg,
       body: Stack(
         children: [
           CallbackShortcuts(
