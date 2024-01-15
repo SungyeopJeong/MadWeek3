@@ -279,6 +279,7 @@ class _StellarViewState extends State<StellarView>
 
             // 해당 노드에 포커스
             _focusOnNode(node);
+            _showNoteViewDialogIfNeeded();
           },
         );
       },
@@ -637,14 +638,19 @@ class _StellarViewState extends State<StellarView>
 
           //   _focusOnNode(star); // 뷰포트 이동
           // }
-
           //});
           setState(() {
-            selectedNode = star; // 새로운 노드를 선택된 노드로 설정합니다.
+            selectedNode = star;
             selectedNode!.showOrbit = true;
             selectedNode!.planetAnimation.repeat(period: Duration(seconds: 10));
 
             _focusOnNode(star);
+
+            // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
+            context.read<NoteViewModel>().titleController.text =
+                selectedNode!.post.title;
+            context.read<NoteViewModel>().contentController.text =
+                selectedNode!.post.markdownContent;
 
             _showNoteViewDialogIfNeeded();
           });
@@ -735,18 +741,44 @@ class _StellarViewState extends State<StellarView>
 
   void _showNoteViewDialogIfNeeded() {
     if (isStarSelected) {
-      showDialog(
+      showGeneralDialog(
         context: context,
-        builder: (BuildContext context) {
-          return Dialog(
-            child: NoteView(
-              star: selectedNode!,
-              onClose: () {
-                Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
-                setState(() {
-                  selectedNode = null;
-                });
-              },
+        barrierColor: Colors.transparent, // 배경색을 투명하게 설정
+        barrierDismissible: true, // 배경을 탭하면 팝업 닫기
+        barrierLabel:
+            MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        transitionDuration: Duration(milliseconds: 200),
+        pageBuilder: (BuildContext buildContext, Animation<double> animation,
+            Animation<double> secondaryAnimation) {
+          return WillPopScope(
+            onWillPop: () async {
+              Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
+              setState(() {
+                selectedNode!.showOrbit = false;
+                selectedNode = null;
+              });
+              return true;
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: Align(
+                alignment: Alignment.centerRight, // 오른쪽 정렬
+                child: Container(
+                  width: MediaQuery.of(context).size.width / 3, // 너비는 화면의 1/3
+                  margin: EdgeInsets.only(
+                      right: 32, top: 32, bottom: 32), // 오른쪽에서 32만큼 여백
+                  child: NoteView(
+                    star: selectedNode!,
+                    onClose: () {
+                      Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
+                      setState(() {
+                        selectedNode!.showOrbit = false;
+                        selectedNode = null;
+                      });
+                    },
+                  ),
+                ),
+              ),
             ),
           );
         },

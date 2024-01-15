@@ -21,6 +21,25 @@ class NoteView extends StatefulWidget {
 class _NoteViewState extends State<NoteView> {
   //텍스트 수정을 위한 선언
   bool isNoteEditing = false;
+  late NoteViewModel noteViewModel; // 클래스 멤버 변수로 선언
+
+  @override
+  void initState() {
+    super.initState();
+    // initState에서 NoteViewModel의 참조를 저장합니다.
+    // Provider.of를 사용하여 context에 안전하게 접근
+    noteViewModel = Provider.of<NoteViewModel>(context, listen: false);
+    noteViewModel.titleController.text = widget.star.post.title;
+    noteViewModel.contentController.text = widget.star.post.markdownContent;
+  }
+
+  @override
+  void dispose() {
+    // 클래스 멤버 변수 noteViewModel을 사용하여 dispose합니다.
+    // noteViewModel.titleController.dispose();
+    // noteViewModel.contentController.dispose();         -> 얘네 dipose 관련 오류 존재
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,12 +126,23 @@ class _NoteViewState extends State<NoteView> {
 
   //note_view의 타이틀 섹션 위젯, 클릭하면 editmode로 전환
   Widget _buildTitleSection() {
+    final noteViewModel = context.watch<NoteViewModel>(); // ViewModel 가져오기
     return isNoteEditing
-        ? _buildTitleTextField()
+        ? TextField(
+            controller: noteViewModel.titleController,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(
+              hintText: 'Enter title',
+              border: InputBorder.none,
+            ),
+            onChanged: (value) {
+              widget.star.post.title = value;
+            },
+          )
         : GestureDetector(
             onTap: _enterEditMode,
             child: Text(
-              widget.star.post.title,
+              noteViewModel.titleController.text, // ViewModel의 컨트롤러에서 제목 가져오기
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
           );
@@ -120,9 +150,22 @@ class _NoteViewState extends State<NoteView> {
 
   //note_view의 컨텐츠 섹션 위젯, 클릭하면 editmode로 전환
   Widget _buildContentSection() {
+    final noteViewModel = context.watch<NoteViewModel>(); // ViewModel 가져오기
+
     return Expanded(
       child: isNoteEditing
-          ? _buildContentTextField()
+          ? TextField(
+              controller: noteViewModel.contentController,
+              style: const TextStyle(fontSize: 16),
+              maxLines: null,
+              decoration: const InputDecoration(
+                hintText: 'Enter content',
+                border: InputBorder.none,
+              ),
+              onChanged: (value) {
+                widget.star.post.markdownContent = value;
+              },
+            )
           : GestureDetector(
               onTap: _enterEditMode,
               child: MarkdownBody(
