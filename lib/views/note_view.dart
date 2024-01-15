@@ -24,25 +24,20 @@ class _NoteViewState extends State<NoteView> {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 32,
-      right: 32,
-      bottom: 32,
-      child: GestureDetector(
-        onTap: () {
-          if (isNoteEditing) _enterViewMode();
-        },
-        behavior: HitTestBehavior.opaque,
-        child: _buildNoteContainer(
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeaderRow(),
-              _buildTitleSection(),
-              const SizedBox(height: 16),
-              _buildContentSection(),
-            ],
-          ),
+    return GestureDetector(
+      onTap: () {
+        if (isNoteEditing) _enterViewMode();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: _buildNoteContainer(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderRow(),
+            _buildTitleSection(),
+            const SizedBox(height: 16),
+            _buildContentSection(),
+          ],
         ),
       ),
     );
