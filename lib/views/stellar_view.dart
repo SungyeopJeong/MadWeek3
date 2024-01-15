@@ -58,6 +58,9 @@ class _StellarViewState extends State<StellarView>
   // 메뉴 호버링 상태를 추적하는 변수 추가
   bool _menuHovering = false;
 
+  late AnimationController _pushAnimationController;
+  late Animation<double> _pushAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -68,7 +71,7 @@ class _StellarViewState extends State<StellarView>
     );
     _transformationController.addListener(_updateZoomSlider);
 
-// InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
+    // InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
     _currentScale =
         (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
             (_maxScale - _minScale);
@@ -86,6 +89,26 @@ class _StellarViewState extends State<StellarView>
       parent: _menuAnimationController,
       curve: Curves.easeInOut,
     ));
+
+    _pushAnimationController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 250));
+    _pushAnimation = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _pushAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _pushAnimation.addListener(() {
+      setState(() {
+        for (final other in graph.nodes) {
+          if (other is Star && other.pushedPos != null) {
+            other.pos = other.pos +
+                (other.pushedPos! - other.pos) * _pushAnimation.value;
+          }
+        }
+      });
+    });
   }
 
   @override
@@ -514,6 +537,18 @@ class _StellarViewState extends State<StellarView>
   }
 
   void _push(Node node) {
+    _calPushedPos(node);
+
+    _pushAnimationController.forward(from: 0).whenComplete(() {
+      for (final other in graph.nodes) {
+        if (other is Star && other.pushedPos != null) {
+          other.pushedPos = null;
+        }
+      }
+    });
+  }
+
+  void _calPushedPos(Node node) {
     const spare = 5.0;
     const radius = (starTotalSize + spare) / 2;
     bool changed = false;
@@ -555,30 +590,8 @@ class _StellarViewState extends State<StellarView>
 
     for (final other in graph.nodes) {
       if (other == node || other is! Star) continue;
-      if (other.pushedPos != null) _push(other);
+      if (other.pushedPos != null) _calPushedPos(other);
     }
-  }
-
-  Widget _buildPushedStar(Star star) {
-    return TweenAnimationBuilder(
-      tween: Tween(
-        begin: star.pos,
-        end: star.pushedPos,
-      ),
-      curve: Curves.easeOutSine,
-      duration: Duration(milliseconds: 250),
-      onEnd: () {
-        setState(() {
-          star.pos = star.pushedPos!;
-          star.pushedPos = null;
-        });
-      },
-      builder: (_, val, __) => Positioned(
-        left: val.dx - starSize / 2,
-        top: val.dy - starSize / 2,
-        child: _buildStarCenter(star),
-      ),
-    );
   }
 
   Widget _buildStarCenter(Star star) {
@@ -917,7 +930,11 @@ class _StellarViewState extends State<StellarView>
       );
     }
     if (star.pushedPos != null) {
-      return _buildPushedStar(star);
+      return Positioned(
+        left: star.pos.dx - starSize / 2,
+        top: star.pos.dy - starSize / 2,
+        child: _buildStarCenter(star),
+      );
     }
     return Positioned(
       left: star.pos.dx - starTotalSize / 2,
