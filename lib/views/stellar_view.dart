@@ -445,7 +445,7 @@ class _StellarViewState extends State<StellarView>
   }
 
   void _showOrbit(Star star) {
-    star.showOrbit = true;
+        star.showOrbit = true;
     if (!star.planetAnimation.isAnimating) {
       star.planetAnimation.repeat(period: Duration(seconds: 10));
     }
@@ -514,11 +514,12 @@ class _StellarViewState extends State<StellarView>
             _showOrbit(other as Star);
             other.showArea = true;
 
-            if (tempPlanet == null) {
+            if (tempPlanet == null && node.canBePlanet) {
               tempPlanet = Planet(star: other, showArea: true)..id = 0;
               other.planets.add(tempPlanet!);
               originEdge!.end = tempPlanet!;
               node.showStar = false;
+              _hideOrbit(node);
             }
           } else {
             _hideOrbit(other as Star);
@@ -528,6 +529,7 @@ class _StellarViewState extends State<StellarView>
               tempPlanet = null;
               originEdge!.end = node;
               node.showStar = true;
+              _showOrbit(node);
             }
           }
         }
@@ -550,6 +552,7 @@ class _StellarViewState extends State<StellarView>
       onPanStart: (details) {
         setState(() {
           _setOnPanStart(star);
+          _showOrbit(star);
         });
       },
       onPanUpdate: (details) {
@@ -565,6 +568,7 @@ class _StellarViewState extends State<StellarView>
       onPanEnd: (_) {
         setState(() {
           _setOnPanEnd(star);
+          _hideOrbit(star);
           star.isDeleting = isBlackholeEnabled;
         });
       },
@@ -684,15 +688,7 @@ class _StellarViewState extends State<StellarView>
     /*GestureDetector(
         onPanUpdate: (details) {
           setState(() {
-            //원래자리에 노드 모양 위젯 생성
-            origin ??= Node(node.pos)
-              ..planetAnimation = AnimationController(
-                vsync: this,
-                upperBound: 2 * pi,
-                duration: Duration(seconds: 10),
-              );
             origin!.showStar = false;
-            originEdge = Edge(origin!, node);
             node.showStar = true;
 
             void updateState(Node? other) {
@@ -743,9 +739,6 @@ class _StellarViewState extends State<StellarView>
                 edges.add(originEdge!);
               }
             }
-
-            origin = null; // `origin`을 `null`로 설정
-            originEdge = null;
           });
         },
       )*/

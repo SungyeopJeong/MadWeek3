@@ -42,13 +42,15 @@ class Star extends Node {
 
   int _newId = 1;
 
+  bool get canBePlanet => planets.isEmpty;
+
   Star({
     required super.pos,
     this.constellation,
     this.showStar = true,
     this.showArea = false,
     this.showOrbit = false,
-    this.isDeleting = false,
+        this.isDeleting = false,
   });
 
   void addPlanet(Planet planet) {
