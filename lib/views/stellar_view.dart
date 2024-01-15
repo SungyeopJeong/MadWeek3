@@ -419,9 +419,15 @@ class _StellarViewState extends State<StellarView>
 
   Widget _buildTextBox(String title, TextStyle style) {
     return IgnorePointer(
-      child: SizedBox(
+      child: Container(
         width: textMaxWidth,
-        child: Text(title, style: style, textAlign: TextAlign.center),
+        alignment: Alignment.center,
+        child: Text(
+          title,
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }
