@@ -444,9 +444,17 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildStarArea(Star star) {
-    return Visibility(
-      visible: star.showOrbit ? true : star.showArea,
-      child: _buildColoredCircle(starAreaSize, MyColor.starArea),
+    final bool visible;
+    if (!star.showStar) {
+      visible = false;
+    } else if (star.showOrbit) {
+      visible = true;
+    } else {
+      visible = star.showArea;
+    }
+    return _buildColoredCircle(
+      starAreaSize,
+      visible ? MyColor.starArea : Colors.transparent,
     );
   }
 
@@ -540,6 +548,7 @@ class _StellarViewState extends State<StellarView>
             if (other.planets.remove(tempPlanet)) {
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
+              graph.removeNode(node);
             }
             if (other.planetAnimation.isAnimating) {
               other.planetAnimation.reset();
@@ -569,6 +578,7 @@ class _StellarViewState extends State<StellarView>
               tempPlanet = Planet(star: other, showArea: true)..id = 0;
               other.planets.add(tempPlanet!);
               originEdge!.end = tempPlanet!;
+              node.showStar = false;
             }
             if (!other.planetAnimation.isAnimating) {
               other.planetAnimation.repeat(period: Duration(seconds: 10));
@@ -579,6 +589,7 @@ class _StellarViewState extends State<StellarView>
             if (other.planets.remove(tempPlanet)) {
               tempPlanet = null;
               originEdge!.end = node;
+              node.showStar = true;
             }
             if (other.planetAnimation.isAnimating) {
               other.planetAnimation.reset();
