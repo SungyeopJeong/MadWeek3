@@ -750,6 +750,12 @@ class _StellarViewState extends State<StellarView>
         transitionDuration: Duration(milliseconds: 200),
         pageBuilder: (BuildContext buildContext, Animation<double> animation,
             Animation<double> secondaryAnimation) {
+          final noteViewModel =
+              Provider.of<NoteViewModel>(buildContext, listen: true);
+          // 팝업의 가로 길이를 결정합니다.
+          final double currentPopupWidth = noteViewModel.isPopupExpanded
+              ? MediaQuery.of(buildContext).size.width - 64
+              : MediaQuery.of(buildContext).size.width / 3 - 32;
           return WillPopScope(
             onWillPop: () async {
               Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
@@ -764,7 +770,7 @@ class _StellarViewState extends State<StellarView>
               child: Align(
                 alignment: Alignment.centerRight, // 오른쪽 정렬
                 child: Container(
-                  width: MediaQuery.of(context).size.width / 3, // 너비는 화면의 1/3
+                  width: currentPopupWidth, // 너비는 화면의 1/3
                   margin: EdgeInsets.only(
                       right: 32, top: 32, bottom: 32), // 오른쪽에서 32만큼 여백
                   child: NoteView(

@@ -20,6 +20,7 @@ class NoteView extends StatefulWidget {
 
 class _NoteViewState extends State<NoteView> {
   //텍스트 수정을 위한 선언
+  bool isExpanded = false; // true -> 전체화면, false -> 1/3
   bool isNoteEditing = false;
   late NoteViewModel noteViewModel; // 클래스 멤버 변수로 선언
 
@@ -35,10 +36,17 @@ class _NoteViewState extends State<NoteView> {
 
   @override
   void dispose() {
-    // 클래스 멤버 변수 noteViewModel을 사용하여 dispose합니다.
-    // noteViewModel.titleController.dispose();
-    // noteViewModel.contentController.dispose();         -> 얘네 dipose 관련 오류 존재
     super.dispose();
+  }
+
+  void _togglePopupSize() {
+    // 현재 상태를 반전시킵니다.
+    setState(() {
+      isExpanded = !isExpanded;
+    });
+    // StellarView에 현재 팝업의 상태를 전달합니다.
+    Provider.of<NoteViewModel>(context, listen: false)
+        .updatePopupWidth(isExpanded);
   }
 
   @override
@@ -77,8 +85,11 @@ class _NoteViewState extends State<NoteView> {
 
   // 노트 뷰 컨테이너 위젯
   Widget _buildNoteContainer(Widget child) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // 팝업의 너비를 상태에 따라 결정합니다.
+    final popupWidth = isExpanded ? screenWidth - 64 : screenWidth / 3 - 32;
     return Container(
-      width: MediaQuery.of(context).size.width / 3 - 32,
+      width: popupWidth,
       padding: const EdgeInsets.symmetric(
           horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
       decoration: BoxDecoration(
@@ -100,6 +111,10 @@ class _NoteViewState extends State<NoteView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        IconButton(
+          icon: Icon(isExpanded ? Icons.compress : Icons.expand),
+          onPressed: _togglePopupSize,
+        ),
         if (isNoteEditing)
           IconButton(
             icon: const Icon(Icons.edit),
