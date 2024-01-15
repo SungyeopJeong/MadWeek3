@@ -401,7 +401,7 @@ class _StellarViewState extends State<StellarView>
   }
 
   List<Widget> _buildTexts(List<Node> nodes) {
-    return nodes.where((node) => node is Star && node.showStar).map((node) {
+    return nodes.where((node) => node is Star && node.showStar && !node.isDeleting).map((node) {
       return Positioned(
         left: node.pos.dx - textMaxWidth / 2,
         top: node.pos.dy + starSize / 2,
