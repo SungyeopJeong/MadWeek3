@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
@@ -63,7 +64,7 @@ class _NoteViewState extends State<NoteView> {
   // 노트 뷰 컨테이너 위젯
   Widget _buildNoteContainer(Widget child) {
     return Container(
-      width: 400, // 창의 너비를 400으로 고정
+      width: MediaQuery.of(context).size.width / 3 - 32,
       padding: const EdgeInsets.symmetric(
           horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
       decoration: BoxDecoration(
@@ -163,7 +164,7 @@ class _NoteViewState extends State<NoteView> {
     return TextField(
       controller: context.read<NoteViewModel>().contentController,
       style: const TextStyle(fontSize: 16),
-      maxLines: null,
+      maxLines: null, // 텍스트 필드가 여러 줄을 차지할 수 있도록 설정
       decoration: const InputDecoration(
         hintText: 'Enter content',
         border: InputBorder.none,
