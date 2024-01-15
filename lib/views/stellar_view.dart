@@ -445,7 +445,7 @@ class _StellarViewState extends State<StellarView>
   }
 
   void _showOrbit(Star star) {
-        star.showOrbit = true;
+    star.showOrbit = true;
     if (!star.planetAnimation.isAnimating) {
       star.planetAnimation.repeat(period: Duration(seconds: 10));
     }
@@ -522,7 +522,7 @@ class _StellarViewState extends State<StellarView>
               _hideOrbit(node);
             }
           } else {
-            _hideOrbit(other as Star);
+            if (selectedNode != other as Star) _hideOrbit(other);
             other.showArea = false;
 
             if (other.planets.remove(tempPlanet)) {
@@ -600,6 +600,9 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildStarOrbit(Star star) {
+    if (!star.showOrbit && selectedNode == star) {
+      _showOrbit(star);
+    }
     return Visibility(
       visible: star.showOrbit,
       child: _buildHelper(
