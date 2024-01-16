@@ -71,7 +71,7 @@ class _StellarViewState extends State<StellarView>
     );
     _transformationController.addListener(_updateZoomSlider);
 
-    // InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
+// InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
     _currentScale =
         (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
             (_maxScale - _minScale);
@@ -179,7 +179,8 @@ class _StellarViewState extends State<StellarView>
               : MediaQuery.of(buildContext).size.width / 3 - 32;
           return WillPopScope(
             onWillPop: () async {
-              Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
+              Navigator.of(buildContext, rootNavigator: true)
+                  .pop(); // 현재 메인도 navigator이니 local의 navigator를 pop하도록 확정함
               setState(() {
                 if (selectedNode is Star) _hideOrbit(selectedNode as Star);
                 selectedNode = null;
@@ -197,7 +198,8 @@ class _StellarViewState extends State<StellarView>
                   child: NoteView(
                     node: selectedNode!,
                     onClose: () {
-                      Navigator.of(context).pop(); // 팝업을 닫을 때 호출됩니다.
+                      // onClose 콜백에서도 동일하게 rootNavigator를 true로 설정합니다.
+                      Navigator.of(buildContext, rootNavigator: true).pop();
                       setState(() {
                         if (selectedNode is Star) {
                           _hideOrbit(selectedNode as Star);
