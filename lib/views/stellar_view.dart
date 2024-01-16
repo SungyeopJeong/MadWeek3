@@ -281,10 +281,14 @@ class _StellarViewState extends State<StellarView>
               CustomPaint(
                 size: Size(double.maxFinite, double.maxFinite),
                 painter: EdgePainter(
-                  graphViewModel.edges,
+                  edges: graphViewModel.edges,
                   originEdge: originEdge,
                 ),
               ),
+              
+              ...graphViewModel.nodes
+                  .whereType<Constellation>()
+                  .map((e) => _convexHull(e)),
               ..._buildNodes(graphViewModel.nodes),
               if (origin != null) _buildOrigin(origin!),
               ..._buildTexts(context.read<GraphViewModel>().nodes),
@@ -567,6 +571,10 @@ class _StellarViewState extends State<StellarView>
           ..planets = []
           ..planetAnimation = AnimationController(vsync: this);
         originEdge = Edge(origin!, node);
+
+        for (final edge in context.read<GraphViewModel>().edges) {
+          edge.replaceIfcontains(node, origin!);
+        }
       default:
         throw _exception;
     }
@@ -578,6 +586,12 @@ class _StellarViewState extends State<StellarView>
       case Planet():
         throw UnimplementedError();
       case Star():
+        for (final edge in context.read<GraphViewModel>().edges) {
+          edge.replaceIfcontains(origin!, node);
+        }
+
+        bool isNodeRemoved = false;
+
         for (final other in context.read<GraphViewModel>().nodes + [origin!]) {
           if (other == node || other is Constellation) continue;
           if (other == origin && mode != Mode.add) continue;
@@ -618,7 +632,7 @@ class _StellarViewState extends State<StellarView>
             if (other.planets.remove(tempPlanet)) {
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
-
+              isNodeRemoved = true;
               node.showStar = true;
               //graph.removeNode(node);
               context.read<GraphViewModel>().removeNode(node);
@@ -630,9 +644,11 @@ class _StellarViewState extends State<StellarView>
         originEdge = null;
         origin = null;
 
-        try {
-          _push(node);
-        } catch (_) {}
+        if (!isNodeRemoved) {
+          try {
+            _push(node);
+          } catch (_) {}
+        }
       default:
         throw _exception;
     }
@@ -886,6 +902,14 @@ class _StellarViewState extends State<StellarView>
               OffsetExt.center(starTotalSize),
               starAreaSize,
             );
+            if (details.localPosition.closeTo(
+              OffsetExt.center(starTotalSize),
+              starOrbitSize,
+            )) {
+              _showOrbit(star);
+            } else {
+              _hideOrbit(star);
+            }
           });
         },
         child: _buildEmptyStar(star),
@@ -906,6 +930,69 @@ class _StellarViewState extends State<StellarView>
       default:
         throw _exception;
     }
+  }
+
+  Widget _convexHull(Constellation constellation) {
+    if (!isEditing || constellation.starsPos.isEmpty) {
+      const spare = 10;
+      const radius = (starTotalSize + spare) / 2;
+      final leftTop = Offset(-radius, -radius),
+          rightTop = Offset(radius, -radius),
+          leftBottom = Offset(-radius, radius),
+          rightBottom = Offset(radius, radius);
+      final points = constellation.stars
+          .expand((star) => [
+                star.pos + leftTop,
+                star.pos + rightTop,
+                star.pos + leftBottom,
+                star.pos + rightBottom
+              ])
+          .toList();
+
+      double ccw(Offset a, Offset b, Offset c) {
+        return (b.dx - a.dx) * (c.dy - a.dy) - (c.dx - a.dx) * (b.dy - a.dy);
+      }
+
+      points.sort((a, b) => a.dy.compareTo(b.dy));
+      points.sort((a, b) {
+        final c = ccw(points[0], a, b);
+        if (c == 0) {
+          return (points[0] - a)
+              .distanceSquared
+              .compareTo((points[0] - b).distanceSquared);
+        }
+        return c > 0 ? -1 : 1;
+      });
+
+      final order = [];
+      var orderTop = 0;
+      void push(int idx) {
+        order.add(idx);
+        orderTop++;
+      }
+
+      void pop() {
+        order.removeLast();
+        orderTop--;
+      }
+
+      push(0);
+      push(1);
+      for (int i = 2; i < points.length; i++) {
+        while (orderTop >= 2 &&
+            ccw(points[i], points[order[orderTop - 2]],
+                    points[order[orderTop - 1]]) <=
+                0) {
+          pop();
+        }
+        push(i);
+      }
+      constellation.starsPos = order.map((e) => points[e]).toList();
+    }
+    return CustomPaint(
+      size: Size(double.maxFinite, double.maxFinite),
+      painter: EdgePainter(corners: constellation.starsPos),
+    );
   }
 
   Widget _buildConstellation(Constellation constellation) {
@@ -1082,10 +1169,13 @@ class _StellarViewState extends State<StellarView>
 }
 
 class EdgePainter extends CustomPainter {
-  final List<Edge> edges;
+  final List<Edge>? edges;
+  final List<Offset>? corners;
   final Edge? originEdge;
 
-  EdgePainter(this.edges, {this.originEdge});
+  static const radius = 10.0;
+
+  EdgePainter({this.edges, this.corners, this.originEdge});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1107,7 +1197,8 @@ class EdgePainter extends CustomPainter {
       final p2 = edge.end.pos;
       final paint = Paint()
         ..color = MyColor.dashedLine
-        ..strokeWidth = 2;
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round;
 
       final unit = (p2 - p1) / (p2 - p1).distance;
       final dash = unit * 10;
@@ -1120,8 +1211,50 @@ class EdgePainter extends CustomPainter {
       }
     }
 
-    for (final edge in edges) {
-      drawLine(edge);
+    /*void drawCircle(Offset p1, Offset p2, Offset p3) {
+      final rect = Rect.fromCircle(center: p2, radius: radius);
+      final a = p1 - p2, b = p3 - p2;
+      final cos = ((a.dx * b.dx) + (a.dy * b.dy)) / (a.distance * b.distance);
+      final tan =a.dy / a.dx;
+      final paint = Paint()
+        ..color = MyColor.line
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(rect, atan(tan), acos(cos), false, paint);
+    }*/
+
+    if (edges != null) {
+      for (final edge in edges!) {
+        drawLine(edge);
+      }
+    }
+    if (corners != null) {
+      /*final points = corners!.indexed.expand((corner) {
+        final before =
+            corners![corner.$1 == 0 ? corners!.length - 1 : corner.$1 - 1];
+        final now = corner.$2;
+        final after = corners![(corner.$1 + 1) % corners!.length];
+        final a = before - now, b = after - now;
+        final cos = ((a.dx * b.dx) + (a.dy * b.dy)) / (a.distance * b.distance);
+        final unita = a / a.distance, unitb = b / b.distance;
+        final c = unita + unitb;
+
+        final center = now + c / c.distance * radius / sqrt((1 - cos) / 2);
+        final l = radius / sqrt((1 - cos) / (1 + cos));
+        final prev = now + unita * l;
+        final next = now + unitb * l;
+        return [prev, center, next];
+      }).toList();
+      for (int i = 0; i < points.length; i += 3) {
+        drawDashedLine(Edge(Node(pos: points[i + 2]),
+            Node(pos: points[(i + 3) % points.length])));
+        drawCircle(points[i], points[i + 1], points[i + 2]);
+      }*/
+      for (int i = 0; i < corners!.length; i++) {
+        drawDashedLine(Edge(Node(pos: corners![i]),
+            Node(pos: corners![(i + 1) % corners!.length])));
+      }
     }
     if (originEdge != null) drawDashedLine(originEdge!);
   }

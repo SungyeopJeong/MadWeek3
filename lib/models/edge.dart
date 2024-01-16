@@ -15,4 +15,12 @@ class Edge {
 
   @override
   int get hashCode => Object.hash(start, end);
+
+  void replaceIfcontains(Node from, Node to) {
+    if (start == from) {
+      start = to;
+    } else if (end == from) {
+      end = to;
+    }
+  }
 }

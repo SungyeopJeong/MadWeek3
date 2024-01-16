@@ -16,4 +16,6 @@ class MyColor {
 
   static const line = Color(0xFF777777);
   static const dashedLine = Color(0xFFCCCCCC);
+
+  static final shadow = const Color(0xFF000000).withOpacity(0.1);
 }
