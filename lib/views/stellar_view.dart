@@ -590,6 +590,8 @@ class _StellarViewState extends State<StellarView>
           edge.replaceIfcontains(origin!, node);
         }
 
+        bool isNodeRemoved = false;
+
         for (final other in context.read<GraphViewModel>().nodes + [origin!]) {
           if (other == node || other is Constellation) continue;
           if (other == origin && mode != Mode.add) continue;
@@ -630,7 +632,7 @@ class _StellarViewState extends State<StellarView>
             if (other.planets.remove(tempPlanet)) {
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
-
+              isNodeRemoved = true;
               node.showStar = true;
               //graph.removeNode(node);
               context.read<GraphViewModel>().removeNode(node);
@@ -642,9 +644,11 @@ class _StellarViewState extends State<StellarView>
         originEdge = null;
         origin = null;
 
-        try {
-          _push(node);
-        } catch (_) {}
+        if (!isNodeRemoved) {
+          try {
+            _push(node);
+          } catch (_) {}
+        }
       default:
         throw _exception;
     }
@@ -898,6 +902,14 @@ class _StellarViewState extends State<StellarView>
               OffsetExt.center(starTotalSize),
               starAreaSize,
             );
+            if (details.localPosition.closeTo(
+              OffsetExt.center(starTotalSize),
+              starOrbitSize,
+            )) {
+              _showOrbit(star);
+            } else {
+              _hideOrbit(star);
+            }
           });
         },
         child: _buildEmptyStar(star),
