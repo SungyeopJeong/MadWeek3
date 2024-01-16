@@ -200,33 +200,4 @@ class _NoteViewState extends State<NoteView> {
             ),
     );
   }
-
-  Widget _buildTitleTextField() {
-    return TextField(
-      controller: context.read<NoteViewModel>().titleController,
-      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-      decoration: const InputDecoration(
-        hintText: 'Enter title',
-        border: InputBorder.none,
-      ),
-      onChanged: (value) {
-        widget.node.post.title = value;
-      },
-    );
-  }
-
-  Widget _buildContentTextField() {
-    return TextField(
-      controller: context.read<NoteViewModel>().contentController,
-      style: const TextStyle(fontSize: 16),
-      maxLines: null, // 텍스트 필드가 여러 줄을 차지할 수 있도록 설정
-      decoration: const InputDecoration(
-        hintText: 'Enter content',
-        border: InputBorder.none,
-      ),
-      onChanged: (value) {
-        widget.node.post.markdownContent = value;
-      },
-    );
-  }
 }

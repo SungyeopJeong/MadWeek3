@@ -14,6 +14,7 @@ import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
+import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/views/note_view.dart';
 
@@ -26,7 +27,7 @@ class StellarView extends StatefulWidget {
 
 class _StellarViewState extends State<StellarView>
     with TickerProviderStateMixin {
-  Graph graph = Graph();
+  //late Graph graph;
   Node? origin;
   Planet? tempPlanet;
   Edge? originEdge;
@@ -101,7 +102,7 @@ class _StellarViewState extends State<StellarView>
 
     _pushAnimation.addListener(() {
       setState(() {
-        for (final other in graph.nodes) {
+        for (final other in context.read<GraphViewModel>().nodes) {
           if (other is Star && other.pushedPos != null) {
             other.pos = other.pos +
                 (other.pushedPos! - other.pos) * _pushAnimation.value;
@@ -153,7 +154,7 @@ class _StellarViewState extends State<StellarView>
               ),
             ),
           ),
-          _buildHoverableMenu()
+          //_buildHoverableMenu()
         ],
       ),
       floatingActionButton: _buildFAB(),
@@ -168,19 +169,20 @@ class _StellarViewState extends State<StellarView>
         barrierDismissible: true, // 배경을 탭하면 팝업 닫기
         barrierLabel:
             MaterialLocalizations.of(context).modalBarrierDismissLabel,
+        useRootNavigator: false,
         transitionDuration: Duration(milliseconds: 200),
         pageBuilder: (BuildContext buildContext, Animation<double> animation,
             Animation<double> secondaryAnimation) {
           final noteViewModel =
               Provider.of<NoteViewModel>(buildContext, listen: true);
+
           // 팝업의 가로 길이를 결정합니다.
           final double currentPopupWidth = noteViewModel.isPopupExpanded
               ? MediaQuery.of(buildContext).size.width - 64
               : MediaQuery.of(buildContext).size.width / 3 - 32;
           return WillPopScope(
             onWillPop: () async {
-              Navigator.of(buildContext, rootNavigator: true)
-                  .pop(); // 현재 메인도 navigator이니 local의 navigator를 pop하도록 확정함
+              Navigator.of(buildContext, rootNavigator: false).pop();
               setState(() {
                 if (selectedNode is Star) _hideOrbit(selectedNode as Star);
                 selectedNode = null;
@@ -198,8 +200,7 @@ class _StellarViewState extends State<StellarView>
                   child: NoteView(
                     node: selectedNode!,
                     onClose: () {
-                      // onClose 콜백에서도 동일하게 rootNavigator를 true로 설정합니다.
-                      Navigator.of(buildContext, rootNavigator: true).pop();
+                      Navigator.of(buildContext, rootNavigator: false).pop();
                       setState(() {
                         if (selectedNode is Star) {
                           _hideOrbit(selectedNode as Star);
@@ -218,6 +219,8 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildBody() {
+    // GraphViewModel을 가져오면서 listen 매개변수를 false로 설정
+    final graphViewModel = Provider.of<GraphViewModel>(context, listen: false);
     return GestureDetector(
       onTapDown: (details) {
         if (mode == Mode.add) {
@@ -227,7 +230,7 @@ class _StellarViewState extends State<StellarView>
               ..planets = []
               ..planetAnimation = AnimationController(vsync: this);
 
-            graph.addNode(newStar);
+            graphViewModel.addNode(newStar);
 
             _focusOnNode(newStar);
 
@@ -275,106 +278,17 @@ class _StellarViewState extends State<StellarView>
               CustomPaint(
                 size: Size(double.maxFinite, double.maxFinite),
                 painter: EdgePainter(
-                  graph.edges,
+                  graphViewModel.edges,
                   originEdge: originEdge,
                 ),
               ),
-              ..._buildNodes(graph.nodes),
+              ..._buildNodes(graphViewModel.nodes),
               if (origin != null) _buildOrigin(origin!),
-              ..._buildTexts(graph.nodes),
+              ..._buildTexts(context.read<GraphViewModel>().nodes),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  // 디렉토리 표시될 사이드바
-  // 메뉴버튼 호버링으로 열고 사이드바 바깥 영역으로 마우스를 이동시켜 닫기
-  Widget _buildHoverableMenu() {
-    return Stack(
-      children: [
-        Positioned(
-          left: 32,
-          top: 32,
-          child: MouseRegion(
-            onEnter: (event) => _menuAnimationController.forward(),
-            child: FloatingActionButton(
-              onPressed: () {
-                // 버튼 클릭 이벤트: 사이드바를 토글
-                isMenuVisible = !isMenuVisible;
-                isMenuVisible
-                    ? _menuAnimationController.forward()
-                    : _menuAnimationController.reverse();
-              },
-              child: Icon(Icons.menu),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 32,
-          bottom: 32,
-          left: 0,
-          child: SlideTransition(
-            position: _menuSlideAnimation,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: MouseRegion(
-                onEnter: (event) => setState(() => _menuHovering = true),
-                onExit: (event) => setState(() {
-                  if (_menuHovering) {
-                    _menuAnimationController.reverse();
-                    _menuHovering = false;
-                    isMenuVisible = false;
-                  }
-                }),
-                child: Container(
-                  width: 240, // 고정 너비
-                  decoration: BoxDecoration(
-                    color: Colors.grey[850], // 사이드바의 배경색
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(12), // 오른쪽 상단 모서리 둥글게
-                      bottomRight: Radius.circular(12), // 오른쪽 하단 모서리 둥글게
-                    ),
-                  ),
-                  child: _buildNodeList(),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 사이드바에서 보여줄 노드 리스트 만들기
-  Widget _buildNodeList() {
-    List<Node> nodes = graph.nodes;
-
-    return ListView.builder(
-      itemCount: nodes.length,
-      itemBuilder: (context, index) {
-        Node node = nodes[index];
-        return ListTile(
-          title: Text(
-            node.post.title,
-            style: TextStyle(color: Colors.white),
-          ),
-          onTap: () {
-            // 탭한 노드를 selectedNode에 할당
-            setState(() {
-              selectedNode = node;
-              if (selectedNode is Star) {
-                _showOrbit(selectedNode as Star);
-              }
-            });
-
-            // 해당 노드에 포커스
-            _focusOnNode(node);
-            _showNoteViewDialogIfNeeded();
-          },
-        );
-      },
     );
   }
 
@@ -450,12 +364,16 @@ class _StellarViewState extends State<StellarView>
     return TweenAnimationBuilder(
       tween: Tween(
         begin: node.pos,
-        end: Offset(0, MediaQuery.of(context).size.height),
+        end: Offset(
+            0,
+            MediaQuery.of(context)
+                .size
+                .height), // 이 깂 출력해서 블랙홀로 제대로 빨려들어가는지 확인해보기
       ),
       duration: Duration(milliseconds: 250),
       onEnd: () {
         setState(() {
-          graph.removeNode(node);
+          context.read<GraphViewModel>().removeNode(node);
         });
       },
       builder: (_, val, __) => childBuilder(val),
@@ -554,7 +472,7 @@ class _StellarViewState extends State<StellarView>
     _calPushedPos(node);
 
     _pushAnimationController.forward(from: 0).whenComplete(() {
-      for (final other in graph.nodes) {
+      for (final other in context.read<GraphViewModel>().nodes) {
         if (other is Star && other.pushedPos != null) {
           other.pushedPos = null;
         }
@@ -569,7 +487,7 @@ class _StellarViewState extends State<StellarView>
     final width = MediaQuery.of(context).size.width * 2;
     final height = MediaQuery.of(context).size.height * 2;
 
-    for (final other in graph.nodes) {
+    for (final other in context.read<GraphViewModel>().nodes) {
       if (other == node || other is! Star) continue;
       final curPos = (node as Star).pushedPos ?? node.pos;
       final otherCurPos = other.pushedPos ?? other.pos;
@@ -602,7 +520,7 @@ class _StellarViewState extends State<StellarView>
 
     if (!changed) return;
 
-    for (final other in graph.nodes) {
+    for (final other in context.read<GraphViewModel>().nodes) {
       if (other == node || other is! Star) continue;
       if (other.pushedPos != null) _calPushedPos(other);
     }
@@ -657,7 +575,7 @@ class _StellarViewState extends State<StellarView>
       case Planet():
         throw UnimplementedError();
       case Star():
-        for (final other in graph.nodes + [origin!]) {
+        for (final other in context.read<GraphViewModel>().nodes + [origin!]) {
           if (other == node || other is Constellation) continue;
           if (other == origin && mode != Mode.add) continue;
           if (other.pos.closeTo(node.pos, starAreaSize + starSize)) {
@@ -675,7 +593,8 @@ class _StellarViewState extends State<StellarView>
               final newConstellation = Constellation()
                 ..stars = [other, node]
                 ..post = Post(title: 'New Constellation');
-              graph.addNode(newConstellation);
+              context.read<GraphViewModel>().addNode(newConstellation);
+              //graph.addNode(newConstellation);
               other.constellation = newConstellation;
               node.constellation = newConstellation;
             } else if (consO == null) {
@@ -685,7 +604,12 @@ class _StellarViewState extends State<StellarView>
               other.constellation!.stars.add(node);
               node.constellation = other.constellation;
             }
-            graph.addEdge(other, node);
+            //graph.addEdge(other, node);
+            context.read<GraphViewModel>().addEdge(other, node);
+
+            _hideOrbit(other);
+            node.pos = origin!.pos;
+            node.showStar = true;
 
             break;
           }
@@ -695,8 +619,10 @@ class _StellarViewState extends State<StellarView>
             if (other.planets.remove(tempPlanet)) {
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
-              graph.removeNode(node);
+
               node.showStar = true;
+              //graph.removeNode(node);
+              context.read<GraphViewModel>().removeNode(node);
             }
             break;
           }
@@ -743,7 +669,7 @@ class _StellarViewState extends State<StellarView>
       case Planet():
         throw UnimplementedError();
       case Star():
-        for (final other in graph.nodes + [origin!]) {
+        for (final other in context.read<GraphViewModel>().nodes + [origin!]) {
           if (other == node) continue;
           if (other == origin && mode != Mode.add) continue;
           if (other is Star) {
