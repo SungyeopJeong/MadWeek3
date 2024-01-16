@@ -156,23 +156,76 @@ class _SplitScreenState extends State<SplitScreen> {
 
   // 노드 리스트를 빌드하는 함수
   Widget _buildNodeList() {
-    return Consumer<GraphViewModel>(
-      builder: (context, graphViewModel, child) {
-        return ListView.builder(
-          itemCount: graphViewModel.nodes.length,
-          itemBuilder: (context, index) {
-            Node node = graphViewModel.nodes[index];
-            return ListTile(
-              title: Text(
-                node.post.title,
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                // 노드 상세 정보 표시
-              },
-            );
-          },
-        );
+    final graphViewModel = Provider.of<GraphViewModel>(context, listen: true);
+
+    return ListView(
+      children: [
+        // 별자리들과 각 별자리의 별들을 표시
+        for (var constellation in graphViewModel.constellations)
+          _buildConstellationTile(constellation, graphViewModel),
+
+        // 독립적인 별들을 표시
+        for (var star in graphViewModel.standaloneStars)
+          _buildStarTile(star, graphViewModel, isStandalone: true),
+      ],
+    );
+  }
+
+  // 별자리를 위한 타일을 구성하는 메서드
+  Widget _buildConstellationTile(
+      Constellation constellation, GraphViewModel graphViewModel) {
+    // 별자리에 대한 타일에는 들여쓰기를 적용하지 않습니다.
+    return ExpansionTile(
+      title:
+          Text(constellation.post.title, style: TextStyle(color: Colors.white)),
+      children: graphViewModel
+          .starsInConstellation(constellation)
+          .map((star) => _buildStarTile(star, graphViewModel,
+              depth: 1)) // 별에 대한 타일에는 들여쓰기를 1단계 적용
+          .toList(),
+    );
+  }
+
+  // 별을 위한 타일을 구성하는 메서드
+  Widget _buildStarTile(Star star, GraphViewModel graphViewModel,
+      {bool isStandalone = false, int depth = 0}) {
+    Widget tile;
+    if (star.planets.isNotEmpty) {
+// 행성이 있는 별에 대한 타일에는 들여쓰기를 depth에 따라 적용
+      tile = ExpansionTile(
+        title: Padding(
+          padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
+          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+        ),
+        children: star.planets
+            .map((planet) => _buildPlanetTile(planet,
+                depth: depth + 1)) // 행성에 대한 타일에는 들여쓰기를 1단계 더 적용
+            .toList(),
+      );
+    } else {
+      // 행성이 없는 별에 대한 타일에는 들여쓰기를 적용하지 않습니다.
+      tile = ListTile(
+        title: Padding(
+          padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
+          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+        ),
+        onTap: () {
+          // 별 상세 정보 표시
+        },
+      );
+    }
+    return tile;
+  }
+
+  // 행성을 위한 리스트를 구성하는 메서드
+  Widget _buildPlanetTile(Planet planet, {int depth = 0}) {
+    return ListTile(
+      title: Padding(
+        padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
+        child: Text(planet.post.title, style: TextStyle(color: Colors.white)),
+      ),
+      onTap: () {
+        // 행성 상세 정보 표시
       },
     );
   }

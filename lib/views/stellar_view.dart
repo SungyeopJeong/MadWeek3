@@ -369,11 +369,7 @@ class _StellarViewState extends State<StellarView>
     return TweenAnimationBuilder(
       tween: Tween(
         begin: node.pos,
-        end: Offset(
-            0,
-            MediaQuery.of(context)
-                .size
-                .height), // 이 깂 출력해서 블랙홀로 제대로 빨려들어가는지 확인해보기
+        end: Offset(MediaQuery.of(context).size.width * 2, 0),
       ),
       duration: Duration(milliseconds: 250),
       onEnd: () {
@@ -1140,10 +1136,10 @@ class _StellarViewState extends State<StellarView>
     final Matrix4 startMatrix = _transformationController.value;
     // 최종 행렬
     final Matrix4 endMatrix = Matrix4.identity()
-      ..scale(3.0)
+      ..scale(1.5)
       ..translate(
-        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 3,
-        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 3,
+        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 1.5,
+        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 1.5,
       );
 
     // Tween을 사용하여 시작과 끝 행렬 사이를 보간합니다.
