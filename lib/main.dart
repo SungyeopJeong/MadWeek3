@@ -58,7 +58,7 @@ class _SplitScreenState extends State<SplitScreen> {
         children: [
           _buildSideView(), // 사이드 뷰를 별도의 함수로 분리하여 호출
           _buildMainNavigator(),
-          _buildFAB(),
+          if (!isNodeListVisible) _buildFAB(),
         ],
       ),
     );
@@ -74,18 +74,29 @@ class _SplitScreenState extends State<SplitScreen> {
       bottom: 0,
       width: 200, // 사이드 뷰의 너비
       child: Material(
+        color: Colors.grey[850],
         elevation: 4.0, // 사이드 뷰에 그림자 효과를 주기 위해 Material 위젯을 사용
-        child: Navigator(
-          onGenerateRoute: (routeSettings) {
-            return MaterialPageRoute(
-              builder: (context) {
-                return Container(
-                  color: Colors.grey[850], // 사이드 뷰의 배경색
-                  child: _buildNodeList(), // 노드 리스트를 여기에 포함
-                );
-              },
-            );
-          },
+        child: Column(
+          children: [
+            // 상단의 닫기 버튼을 감싸는 SafeArea
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0), // 여기에 패딩을 추가합니다.
+                  child: IconButton(
+                    icon: Icon(Icons.keyboard_double_arrow_left,
+                        color: Colors.white),
+                    onPressed: toggleNodeList,
+                  ),
+                ),
+              ),
+            ),
+            // 나머지 공간을 차지하는 노드 리스트
+            Expanded(
+              child: _buildNodeList(),
+            ),
+          ],
         ),
       ),
     );
@@ -116,11 +127,12 @@ class _SplitScreenState extends State<SplitScreen> {
     return AnimatedPositioned(
       duration: Duration(microseconds: 300),
       curve: Curves.easeInOut,
-      top: 32,
-      left: isNodeListVisible ? 200 + 32 : 32,
+      top: 16,
+      left: 16,
       child: FloatingActionButton(
+        backgroundColor: Colors.grey[850], // 버튼 배경색을 사이드뷰와 동일한 색상으로 설정
         onPressed: toggleNodeList,
-        child: Icon(isNodeListVisible ? Icons.close : Icons.menu),
+        child: Icon(Icons.menu, color: Colors.white),
       ),
     );
   }

@@ -1,8 +1,9 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import 'package:week3/const/color.dart';
 import 'package:week3/models/node.dart';
+import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
 
 class NoteView extends StatefulWidget {
@@ -27,6 +28,7 @@ class _NoteViewState extends State<NoteView> {
   @override
   void initState() {
     super.initState();
+
     // initState에서 NoteViewModel의 참조를 저장합니다.
     // Provider.of를 사용하여 context에 안전하게 접근
     noteViewModel = Provider.of<NoteViewModel>(context, listen: false);
@@ -37,6 +39,7 @@ class _NoteViewState extends State<NoteView> {
   @override
   void dispose() {
     super.dispose();
+    isExpanded = false;
   }
 
   void _togglePopupSize() {
@@ -61,6 +64,7 @@ class _NoteViewState extends State<NoteView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeaderRow(),
+            const SizedBox(height: 8),
             _buildTitleSection(),
             const SizedBox(height: 16),
             _buildContentSection(),
@@ -86,18 +90,24 @@ class _NoteViewState extends State<NoteView> {
   // 노트 뷰 컨테이너 위젯
   Widget _buildNoteContainer(Widget child) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    double sidepadding =
+        isExpanded ? screenWidth / 4 : 32; // 확장되었을 때 0, 아닐 때 1/4
     // 팝업의 너비를 상태에 따라 결정합니다.
-    final popupWidth = isExpanded ? screenWidth - 64 : screenWidth / 3 - 32;
+    // final popupWidth = isExpanded ? screenWidth : screenWidth / 3 - 32;
+    // final popupHeight = isExpanded ? screenHeight : screenHeight - 32;
     return Container(
-      width: popupWidth,
-      padding: const EdgeInsets.symmetric(
-          horizontal: 32, vertical: 16), // 좌우 32, 위아래 16 패딩
+      width: screenWidth,
+      height: screenHeight,
+
+      padding: EdgeInsets.symmetric(
+          horizontal: sidepadding, vertical: 16), // 좌우 32, 위아래 16 패딩
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: MyColor.onSurface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: MyColor.shadow,
             blurRadius: 10,
           ),
         ],
@@ -109,12 +119,12 @@ class _NoteViewState extends State<NoteView> {
   // 노트뷰의 상단, 아이콘 배치 위젯
   Widget _buildHeaderRow() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
           icon: Icon(isExpanded ? Icons.compress : Icons.expand),
           onPressed: _togglePopupSize,
         ),
+        SizedBox(width: 2), // 간격 조절
         if (isNoteEditing)
           IconButton(
             icon: const Icon(Icons.edit),
@@ -125,6 +135,15 @@ class _NoteViewState extends State<NoteView> {
             icon: const Icon(Icons.my_library_books_rounded),
             onPressed: _enterEditMode,
           ),
+        SizedBox(width: 2), // 간격 조절
+        IconButton(
+          icon: Icon(Icons.delete_outline, color: Colors.red),
+          onPressed: _showDeleteConfirmation,
+        ),
+        Expanded(
+          // 나머지 공간을 채우기 위해 Expanded 위젯 사용
+          child: Container(),
+        ),
         IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
@@ -138,6 +157,35 @@ class _NoteViewState extends State<NoteView> {
           },
         ),
       ],
+    );
+  }
+
+  // 삭제 확인 대화상자를 표시하는 함수
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('정말 삭제하시겠습니까?'),
+          content: const Text('이 작업을 수행하면 되돌릴 수 없습니다.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('삭제하기'),
+              onPressed: () {
+                Navigator.of(context).pop(); // 대화상자 닫기
+                context.read<GraphViewModel>().removeNode(widget.node);
+                widget.onClose();
+              },
+            ),
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -174,6 +222,7 @@ class _NoteViewState extends State<NoteView> {
           ? TextField(
               controller: noteViewModel.contentController,
               style: const TextStyle(fontSize: 16),
+              minLines: 10,
               maxLines: null,
               decoration: const InputDecoration(
                 hintText: 'Enter content',

@@ -178,8 +178,12 @@ class _StellarViewState extends State<StellarView>
 
           // 팝업의 가로 길이를 결정합니다.
           final double currentPopupWidth = noteViewModel.isPopupExpanded
-              ? MediaQuery.of(buildContext).size.width - 64
+              ? MediaQuery.of(buildContext).size.width
               : MediaQuery.of(buildContext).size.width / 3 - 32;
+
+          final EdgeInsets currentmargin = noteViewModel.isPopupExpanded
+              ? EdgeInsets.zero
+              : EdgeInsets.only(right: 32, top: 32, bottom: 32);
           return WillPopScope(
             onWillPop: () async {
               Navigator.of(buildContext, rootNavigator: false).pop();
@@ -195,8 +199,7 @@ class _StellarViewState extends State<StellarView>
                 alignment: Alignment.centerRight, // 오른쪽 정렬
                 child: Container(
                   width: currentPopupWidth, // 너비는 화면의 1/3
-                  margin: EdgeInsets.only(
-                      right: 32, top: 32, bottom: 32), // 오른쪽에서 32만큼 여백
+                  margin: currentmargin,
                   child: NoteView(
                     node: selectedNode!,
                     onClose: () {
@@ -606,10 +609,6 @@ class _StellarViewState extends State<StellarView>
             }
             //graph.addEdge(other, node);
             context.read<GraphViewModel>().addEdge(other, node);
-
-            _hideOrbit(other);
-            node.pos = origin!.pos;
-            node.showStar = true;
 
             break;
           }
