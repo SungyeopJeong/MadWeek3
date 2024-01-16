@@ -288,7 +288,7 @@ class _StellarViewState extends State<StellarView>
               
               ...graphViewModel.nodes
                   .whereType<Constellation>()
-                  .map((e) => _convexHull(e.stars)),
+                  .map((e) => _convexHull(e)),
               ..._buildNodes(graphViewModel.nodes),
               if (origin != null) _buildOrigin(origin!),
               ..._buildTexts(context.read<GraphViewModel>().nodes),
@@ -571,6 +571,10 @@ class _StellarViewState extends State<StellarView>
           ..planets = []
           ..planetAnimation = AnimationController(vsync: this);
         originEdge = Edge(origin!, node);
+
+        for (final edge in graph.edges) {
+          edge.replaceIfcontains(node, origin!);
+        }
       default:
         throw _exception;
     }
@@ -582,6 +586,10 @@ class _StellarViewState extends State<StellarView>
       case Planet():
         throw UnimplementedError();
       case Star():
+        for (final edge in context.read<GraphViewModel>().edges) {
+          edge.replaceIfcontains(origin!, node);
+        }
+
         for (final other in context.read<GraphViewModel>().nodes + [origin!]) {
           if (other == node || other is Constellation) continue;
           if (other == origin && mode != Mode.add) continue;
@@ -912,65 +920,66 @@ class _StellarViewState extends State<StellarView>
     }
   }
 
-  Widget _convexHull(List<Star> stars) {
-    const spare = 10;
-    const radius = (starTotalSize + spare) / 2;
-    final leftTop = Offset(-radius, -radius),
-        rightTop = Offset(radius, -radius),
-        leftBottom = Offset(-radius, radius),
-        rightBottom = Offset(radius, radius);
-    final points = stars
-        .expand((star) => [
-              star.pos + leftTop,
-              star.pos + rightTop,
-              star.pos + leftBottom,
-              star.pos + rightBottom
-            ])
-        .toList();
+  Widget _convexHull(Constellation constellation) {
+    if (!isEditing || constellation.starsPos.isEmpty) {
+      const spare = 10;
+      const radius = (starTotalSize + spare) / 2;
+      final leftTop = Offset(-radius, -radius),
+          rightTop = Offset(radius, -radius),
+          leftBottom = Offset(-radius, radius),
+          rightBottom = Offset(radius, radius);
+      final points = constellation.stars
+          .expand((star) => [
+                star.pos + leftTop,
+                star.pos + rightTop,
+                star.pos + leftBottom,
+                star.pos + rightBottom
+              ])
+          .toList();
 
-    double ccw(Offset a, Offset b, Offset c) {
-      return (b.dx - a.dx) * (c.dy - a.dy) - (c.dx - a.dx) * (b.dy - a.dy);
-    }
-
-    points.sort((a, b) => a.dy.compareTo(b.dy));
-    points.sort((a, b) {
-      final c = ccw(points[0], a, b);
-      if (c == 0) {
-        return (points[0] - a)
-            .distanceSquared
-            .compareTo((points[0] - b).distanceSquared);
+      double ccw(Offset a, Offset b, Offset c) {
+        return (b.dx - a.dx) * (c.dy - a.dy) - (c.dx - a.dx) * (b.dy - a.dy);
       }
-      return c > 0 ? -1 : 1;
-    });
 
-    final order = [];
-    var orderTop = 0;
-    void push(int idx) {
-      order.add(idx);
-      orderTop++;
-    }
+      points.sort((a, b) => a.dy.compareTo(b.dy));
+      points.sort((a, b) {
+        final c = ccw(points[0], a, b);
+        if (c == 0) {
+          return (points[0] - a)
+              .distanceSquared
+              .compareTo((points[0] - b).distanceSquared);
+        }
+        return c > 0 ? -1 : 1;
+      });
 
-    void pop() {
-      order.removeLast();
-      orderTop--;
-    }
-
-    push(0);
-    push(1);
-    for (int i = 2; i < points.length; i++) {
-      while (orderTop >= 2 &&
-          ccw(points[i], points[order[orderTop - 2]],
-                  points[order[orderTop - 1]]) <=
-              0) {
-        pop();
+      final order = [];
+      var orderTop = 0;
+      void push(int idx) {
+        order.add(idx);
+        orderTop++;
       }
-      push(i);
+
+      void pop() {
+        order.removeLast();
+        orderTop--;
+      }
+
+      push(0);
+      push(1);
+      for (int i = 2; i < points.length; i++) {
+        while (orderTop >= 2 &&
+            ccw(points[i], points[order[orderTop - 2]],
+                    points[order[orderTop - 1]]) <=
+                0) {
+          pop();
+        }
+        push(i);
+      }
+      constellation.starsPos = order.map((e) => points[e]).toList();
     }
     return CustomPaint(
       size: Size(double.maxFinite, double.maxFinite),
-      painter: EdgePainter(
-        corners: order.map((e) => points[e]).toList(),
-      ),
+      painter: EdgePainter(corners: constellation.starsPos),
     );
   }
 
