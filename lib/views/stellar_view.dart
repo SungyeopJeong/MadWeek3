@@ -10,7 +10,6 @@ import 'package:week3/const/size.dart';
 import 'package:week3/const/text.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/extensions/offset.dart';
-import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
@@ -285,7 +284,6 @@ class _StellarViewState extends State<StellarView>
                   originEdge: originEdge,
                 ),
               ),
-              
               ...graphViewModel.nodes
                   .whereType<Constellation>()
                   .map((e) => _convexHull(e)),
@@ -1013,8 +1011,8 @@ class _StellarViewState extends State<StellarView>
     final blackholeSize =
         isBlackholeEnabled ? blackholeMaxSize : blackholeMinSize;
     return Positioned(
-      left: -blackholeAreaSize / 2,
-      bottom: -blackholeAreaSize / 2,
+      right: -blackholeAreaSize / 2,
+      top: -blackholeAreaSize / 2,
       child: MouseRegion(
         onEnter: (_) {
           setState(() {
@@ -1046,18 +1044,19 @@ class _StellarViewState extends State<StellarView>
 
   // 줌슬라이더 만드는 함수
   Widget _buildZoomSlider() {
+    final screenHeight = MediaQuery.of(context).size.height;
     return Positioned(
-      left: 32,
-      top: (MediaQuery.of(context).size.height - 320) / 2,
+      right: 32,
+      top: screenHeight * 3 / 8,
       child: Container(
-        width: 48,
-        height: 320,
+        width: 32,
+        height: screenHeight / 4,
         decoration: BoxDecoration(
           color: Color(0xFFE5E5E1),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: MyColor.shadow,
               blurRadius: 4,
               offset: Offset(0, 0),
             ),
@@ -1092,7 +1091,7 @@ class _StellarViewState extends State<StellarView>
         inactiveTrackColor: Color(0xFFC5C5C5),
         activeTrackColor: Color(0xFF4D4D4D),
         overlayColor: Colors.transparent,
-        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 10.0),
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5.0),
         trackShape: RoundedRectSliderTrackShape(),
       ),
       child: slider,

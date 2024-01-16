@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:week3/const/color.dart';
 import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
@@ -125,14 +126,30 @@ class _SplitScreenState extends State<SplitScreen> {
   // FAB를 구성하는 별도의 함수
   Widget _buildFAB() {
     return AnimatedPositioned(
-      duration: Duration(microseconds: 300),
+      duration: Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       top: 16,
       left: 16,
-      child: FloatingActionButton(
-        backgroundColor: Colors.grey[850], // 버튼 배경색을 사이드뷰와 동일한 색상으로 설정
-        onPressed: toggleNodeList,
-        child: Icon(Icons.menu, color: Colors.white),
+      child: GestureDetector(
+        // InkWell or GestureDetector for the tap
+        onTap: toggleNodeList,
+        child: Container(
+          width: 48.0, // FAB의 기본 크기와 동일
+          height: 48.0,
+          decoration: BoxDecoration(
+            color: MyColor.surface,
+            boxShadow: [
+              BoxShadow(
+                color: MyColor.shadow, // 색상의 투명도 조절
+                spreadRadius: 0,
+                blurRadius: 4,
+                offset: Offset(0, 0), // 그림자 위치 조절
+              ),
+            ],
+            borderRadius: BorderRadius.circular(12), // 라운드 조절
+          ),
+          child: Icon(Icons.menu, color: MyColor.onSurface),
+        ),
       ),
     );
   }
