@@ -7,3 +7,4 @@ const starTotalSize = starOrbitSize + planetAreaSize;
 const blackholeAreaSize = 200.0;
 const blackholeMinSize = 120.0;
 const blackholeMaxSize = 160.0;
+const textMaxWidth = 320.0;

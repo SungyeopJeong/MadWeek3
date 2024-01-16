@@ -58,6 +58,9 @@ class _StellarViewState extends State<StellarView>
   // 메뉴 호버링 상태를 추적하는 변수 추가
   bool _menuHovering = false;
 
+  late AnimationController _pushAnimationController;
+  late Animation<double> _pushAnimation;
+
   @override
   void initState() {
     super.initState();
@@ -68,7 +71,7 @@ class _StellarViewState extends State<StellarView>
     );
     _transformationController.addListener(_updateZoomSlider);
 
-// InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
+    // InteractiveViewer의 초기 스케일을 기반으로 _currentScale 값을 설정합니다.
     _currentScale =
         (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
             (_maxScale - _minScale);
@@ -86,6 +89,26 @@ class _StellarViewState extends State<StellarView>
       parent: _menuAnimationController,
       curve: Curves.easeInOut,
     ));
+
+    _pushAnimationController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 250));
+    _pushAnimation = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _pushAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _pushAnimation.addListener(() {
+      setState(() {
+        for (final other in graph.nodes) {
+          if (other is Star && other.pushedPos != null) {
+            other.pos = other.pos +
+                (other.pushedPos! - other.pos) * _pushAnimation.value;
+          }
+        }
+      });
+    });
   }
 
   @override
@@ -198,10 +221,7 @@ class _StellarViewState extends State<StellarView>
         if (mode == Mode.add) {
           setState(() {
             Star newStar = Star(pos: details.localPosition)
-              ..post = Post(
-                title: "Title Here",
-                markdownContent: "Content Here",
-              )
+              ..post = Post(title: 'New Star')
               ..planets = []
               ..planetAnimation = AnimationController(vsync: this);
 
@@ -259,6 +279,7 @@ class _StellarViewState extends State<StellarView>
               ),
               ..._buildNodes(graph.nodes),
               if (origin != null) _buildOrigin(origin!),
+              ..._buildTexts(graph.nodes),
             ],
           ),
         ),
@@ -378,7 +399,13 @@ class _StellarViewState extends State<StellarView>
   }
 
   List<Widget> _buildNodes(List<Node> nodes) {
-    return nodes.skipWhile((node) => node is Planet).map((node) {
+    final sortedNodes = nodes.where((node) => node is! Planet).toList()
+      ..sort((a, b) => (a is Constellation)
+          ? (b is Constellation)
+              ? 0
+              : 1
+          : -1);
+    return sortedNodes.map((node) {
       switch (node) {
         case Star():
           return _buildStar(node);
@@ -387,6 +414,33 @@ class _StellarViewState extends State<StellarView>
         default:
           throw _exception;
       }
+    }).toList();
+  }
+
+  Widget _buildTextBox(String title, TextStyle style) {
+    return IgnorePointer(
+      child: Container(
+        width: textMaxWidth,
+        alignment: Alignment.center,
+        child: Text(
+          title,
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildTexts(List<Node> nodes) {
+    return nodes
+        .where((node) => node is Star && node.showStar && !node.isDeleting)
+        .map((node) {
+      return Positioned(
+        left: node.pos.dx - textMaxWidth / 2,
+        top: node.pos.dy + starSize / 2,
+        child: _buildTextBox(node.post.title, MyText.labelRegular),
+      );
     }).toList();
   }
 
@@ -495,6 +549,18 @@ class _StellarViewState extends State<StellarView>
   }
 
   void _push(Node node) {
+    _calPushedPos(node);
+
+    _pushAnimationController.forward(from: 0).whenComplete(() {
+      for (final other in graph.nodes) {
+        if (other is Star && other.pushedPos != null) {
+          other.pushedPos = null;
+        }
+      }
+    });
+  }
+
+  void _calPushedPos(Node node) {
     const spare = 5.0;
     const radius = (starTotalSize + spare) / 2;
     bool changed = false;
@@ -536,30 +602,8 @@ class _StellarViewState extends State<StellarView>
 
     for (final other in graph.nodes) {
       if (other == node || other is! Star) continue;
-      if (other.pushedPos != null) _push(other);
+      if (other.pushedPos != null) _calPushedPos(other);
     }
-  }
-
-  Widget _buildPushedStar(Star star) {
-    return TweenAnimationBuilder(
-      tween: Tween(
-        begin: star.pos,
-        end: star.pushedPos,
-      ),
-      curve: Curves.easeOutSine,
-      duration: Duration(milliseconds: 250),
-      onEnd: () {
-        setState(() {
-          star.pos = star.pushedPos!;
-          star.pushedPos = null;
-        });
-      },
-      builder: (_, val, __) => Positioned(
-        left: val.dx - starSize / 2,
-        top: val.dy - starSize / 2,
-        child: _buildStarCenter(star),
-      ),
-    );
   }
 
   Widget _buildStarCenter(Star star) {
@@ -612,11 +656,16 @@ class _StellarViewState extends State<StellarView>
         throw UnimplementedError();
       case Star():
         for (final other in graph.nodes + [origin!]) {
-          if (other == node) continue;
+          if (other == node || other is Constellation) continue;
           if (other == origin && mode != Mode.add) continue;
           if (other.pos.closeTo(node.pos, starAreaSize + starSize)) {
             final consO = (other as Star).constellation,
                 consN = node.constellation;
+
+            _hideOrbit(other);
+            node.pos = origin!.pos;
+            node.showStar = true;
+
             if (consO != null && consN != null && consO != consN) {
               break;
             }
@@ -636,10 +685,6 @@ class _StellarViewState extends State<StellarView>
             }
             graph.addEdge(other, node);
 
-            _hideOrbit(other);
-            node.pos = origin!.pos;
-            node.showStar = true;
-
             break;
           }
           if (other.pos.closeTo(node.pos, starOrbitSize + starSize)) {
@@ -649,6 +694,7 @@ class _StellarViewState extends State<StellarView>
               other.addPlanet(Planet(star: other));
               tempPlanet = null;
               graph.removeNode(node);
+              node.showStar = true;
             }
             break;
           }
@@ -667,11 +713,17 @@ class _StellarViewState extends State<StellarView>
 
   void _connectToTemp(Star other, Star node) {
     if (tempPlanet == null && node.canBePlanet) {
-      tempPlanet = Planet(star: other, showArea: true)..id = 0;
+      tempPlanet = Planet(star: other, showArea: true)
+        ..id = 0
+        ..post = Post(title: node.post.title);
       other.planets.add(tempPlanet!);
       originEdge!.end = tempPlanet!;
       node.showStar = false;
       _hideOrbit(node);
+    } else if (!node.canBePlanet) {
+      originEdge!.end = node;
+      node.showStar = true;
+      _showOrbit(node);
     }
   }
 
@@ -821,20 +873,45 @@ class _StellarViewState extends State<StellarView>
                 children: star.planets
                     .map(
                       (planet) => Positioned(
-                        left: starTotalSize / 2 +
-                            planet.pos.dx -
-                            star.pos.dx -
-                            planetAreaSize / 2,
-                        top: starTotalSize / 2 +
-                            planet.pos.dy -
-                            star.pos.dy -
-                            planetAreaSize / 2,
+                        left: (starTotalSize - planetAreaSize) / 2 +
+                            (planet.pos.dx - star.pos.dx),
+                        top: (starTotalSize - planetAreaSize) / 2 +
+                            (planet.pos.dy - star.pos.dy),
                         child: _buildPlanet(planet),
                       ),
                     )
                     .toList(),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanetsText(Star star) {
+    return Visibility(
+      visible: star.showOrbit,
+      child: _buildHelper(
+        starTotalSize,
+        [
+          AnimatedBuilder(
+            animation: star.planetAnimation,
+            builder: (_, __) => Stack(
+              clipBehavior: Clip.none,
+              children: star.planets
+                  .map(
+                    (planet) => Positioned(
+                      left: (starTotalSize - textMaxWidth) / 2 +
+                          (planet.pos.dx - star.pos.dx),
+                      top: (starTotalSize + planetSize) / 2 +
+                          (planet.pos.dy - star.pos.dy),
+                      child:
+                          _buildTextBox(planet.post.title, MyText.tinyRegular),
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
         ],
       ),
@@ -848,6 +925,7 @@ class _StellarViewState extends State<StellarView>
         _buildStarOrbit(star),
         _buildStarCenter(star),
         _buildStarArea(star),
+        _buildPlanetsText(star),
       ],
     );
   }
@@ -864,7 +942,11 @@ class _StellarViewState extends State<StellarView>
       );
     }
     if (star.pushedPos != null) {
-      return _buildPushedStar(star);
+      return Positioned(
+        left: star.pos.dx - starSize / 2,
+        top: star.pos.dy - starSize / 2,
+        child: _buildStarCenter(star),
+      );
     }
     return Positioned(
       left: star.pos.dx - starTotalSize / 2,
@@ -882,63 +964,6 @@ class _StellarViewState extends State<StellarView>
         child: _buildEmptyStar(star),
       ),
     );
-    /*GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            origin!.showStar = false;
-            node.showStar = true;
-
-            void updateState(Node? other) {
-              if (other == node || other == null) return;
-              final distanceSquared = (other.pos - node.pos).distanceSquared;
-              double radiusSquared(double diameter) => diameter * diameter / 4;
-              if (distanceSquared <= radiusSquared(areaSize)) {
-                final edge = Edge(origin!, other);
-                if (!edges.any((element) => element == edge)) {
-                  origin!.showStar = true;
-                  originEdge = edge;
-                  node.showStar = false;
-                }
-                return;
-              }
-              if (distanceSquared <= radiusSquared(orbitSize)) {
-                other.showOrbit = true;
-                if (!other.planetAnimation.isAnimating) {
-                  other.planetAnimation.repeat();
-                }
-              } else {
-                other.showOrbit = false;
-                if (other.planetAnimation.isAnimating) {
-                  other.planetAnimation.reset();
-                }
-              }
-            }
-
-            for (final other in nodes) {
-              updateState(other);
-            }
-            if (mode == Mode.add) {
-              updateState(origin);
-            }
-          });
-        },
-        onPanEnd: (details) {
-          setState(() {
-            for (final node in nodes) {
-              node.showOrbit = false;
-            }
-
-            if (origin?.showStar ?? false) {
-              node.pos = origin!.pos;
-              node.showStar = true;
-              originEdge!.node1 = node;
-              if (!edges.contains(originEdge)) {
-                edges.add(originEdge!);
-              }
-            }
-          });
-        },
-      )*/
   }
 
   Widget _buildOrigin(Node node) {
@@ -957,26 +982,16 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildConstellation(Constellation constellation) {
-    final center =
-        constellation.stars.fold(Offset.zero, (prev, star) => prev + star.pos) /
-            constellation.stars.length.toDouble();
-    constellation.pos = center;
+    if (!isEditing || constellation.pos == Offset.zero) {
+      final center = constellation.stars
+              .fold(Offset.zero, (prev, star) => prev + star.pos) /
+          constellation.stars.length.toDouble();
+      constellation.pos = center;
+    }
     return Positioned(
-      left: center.dx - 160,
-      top: center.dy,
-      child: GestureDetector(
-        onTap: () => _openNote(constellation),
-        child: Container(
-          width: 320,
-          alignment: Alignment.center,
-          child: Text(
-            constellation.post.title,
-            style: MyText.displayRegular,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      left: constellation.pos.dx - textMaxWidth / 2,
+      top: constellation.pos.dy,
+      child: _buildTextBox(constellation.post.title, MyText.displayRegular),
     );
   }
 
@@ -1153,7 +1168,11 @@ class EdgePainter extends CustomPainter {
       final paint = Paint()
         ..color = MyColor.line
         ..strokeWidth = 1;
-      canvas.drawLine(p1, p2, paint);
+
+      final unit = (p2 - p1) / (p2 - p1).distance;
+      final gap = unit * (starAreaSize + starSize) / 4;
+
+      canvas.drawLine(p1 + gap, p2 - gap, paint);
     }
 
     void drawDashedLine(Edge edge) {
