@@ -572,7 +572,7 @@ class _StellarViewState extends State<StellarView>
           ..planetAnimation = AnimationController(vsync: this);
         originEdge = Edge(origin!, node);
 
-        for (final edge in graph.edges) {
+        for (final edge in context.read<GraphViewModel>().edges) {
           edge.replaceIfcontains(node, origin!);
         }
       default:
