@@ -22,10 +22,10 @@ class StellarView extends StatefulWidget {
   const StellarView({super.key});
 
   @override
-  State<StellarView> createState() => _StellarViewState();
+  State<StellarView> createState() => StellarViewState();
 }
 
-class _StellarViewState extends State<StellarView>
+class StellarViewState extends State<StellarView>
     with TickerProviderStateMixin {
   //late Graph graph;
   Node? origin;
@@ -462,7 +462,7 @@ class _StellarViewState extends State<StellarView>
             _push(context.read<GraphViewModel>().nodes.last);
           });
         },
-        onTap: () => () => _openNote(planet),
+        onTap: () => openNote(planet),
         child: _buildEmptyPlanet(planet),
       ),
     );
@@ -724,7 +724,7 @@ class _StellarViewState extends State<StellarView>
     }
   }
 
-  void _openNote(Node node) {
+  void openNote(Node node) {
     setState(() {
       // 새 노드를 선택합니다.
       if (selectedNode != node) {
@@ -735,6 +735,7 @@ class _StellarViewState extends State<StellarView>
 
         selectedNode = node; // 새로운 노드를 선택된 노드로 설정합니다.
         if (selectedNode is Star) _showOrbit(selectedNode as Star);
+        if (selectedNode is Planet) _showOrbit((selectedNode as Planet).star);
 
         // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
         context.read<NoteViewModel>().titleController.text =
@@ -802,7 +803,7 @@ class _StellarViewState extends State<StellarView>
           }
         });
       },
-      onTap: () => _openNote(star),
+      onTap: () => openNote(star),
       child: _buildColoredCircle(
         starAreaSize,
         visible ? MyColor.starArea : Colors.transparent,
@@ -1038,7 +1039,7 @@ class _StellarViewState extends State<StellarView>
           });
         },
         child: GestureDetector(
-          onTap: () => _openNote(constellation),
+          onTap: () => openNote(constellation),
           child: CustomPaint(
             size: Size(maxX - minX, maxY - minY),
             painter: EdgePainter(

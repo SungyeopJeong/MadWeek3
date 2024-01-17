@@ -39,6 +39,7 @@ class SplitScreen extends StatefulWidget {
 
 class _SplitScreenState extends State<SplitScreen> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<StellarViewState> stellarKey = GlobalKey();
   bool isNodeListVisible = false;
 
   // 스플릿 뷰의 너비 상태를 추가합니다.
@@ -120,7 +121,7 @@ class _SplitScreenState extends State<SplitScreen> {
               key: navigatorKey,
               onGenerateRoute: (settings) {
                 return MaterialPageRoute(
-                  builder: (context) => StellarView(),
+                  builder: (context) => StellarView(key: stellarKey),
                 );
               },
             ),
@@ -201,6 +202,9 @@ class _SplitScreenState extends State<SplitScreen> {
           .map((star) => _buildStarTile(star, graphViewModel,
               depth: 1)) // 별에 대한 타일에는 들여쓰기를 1단계 적용
           .toList(),
+      onExpansionChanged: (isExpanded) {
+        if (isExpanded) stellarKey.currentState?.openNote(constellation);
+      },
     );
   }
 
@@ -220,6 +224,9 @@ class _SplitScreenState extends State<SplitScreen> {
             .map((planet) => _buildPlanetTile(planet,
                 depth: depth + 1)) // 행성에 대한 타일에는 들여쓰기를 1단계 더 적용
             .toList(),
+        onExpansionChanged: (isExpanded) {
+          if (isExpanded) stellarKey.currentState?.openNote(star);
+        },
       );
     } else {
       // 행성이 없는 별에 대한 타일에는 들여쓰기를 적용하지 않습니다.
@@ -231,6 +238,7 @@ class _SplitScreenState extends State<SplitScreen> {
         ),
         onTap: () {
           // 별 상세 정보 표시
+          stellarKey.currentState?.openNote(star);
         },
       );
     }
@@ -247,6 +255,7 @@ class _SplitScreenState extends State<SplitScreen> {
       ),
       onTap: () {
         // 행성 상세 정보 표시
+        stellarKey.currentState?.openNote(planet);
       },
     );
   }
