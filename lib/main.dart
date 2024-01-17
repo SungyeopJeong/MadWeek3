@@ -7,6 +7,7 @@ import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/views/note_view.dart';
 import 'package:week3/views/stellar_view.dart';
+import 'package:week3/views/intro_view.dart';
 
 void main() {
   runApp(const MainApp());
@@ -23,7 +24,7 @@ class MainApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GraphViewModel()),
       ],
       child: MaterialApp(
-        home: SplitScreen(),
+        home: IntroScreen(), // 변경된 부분: IntroScreen을 초기 화면으로 설정
       ),
     );
   }
@@ -112,13 +113,30 @@ class _SplitScreenState extends State<SplitScreen> {
       right: 0,
       top: 0,
       bottom: 0,
-      child: Navigator(
-        key: navigatorKey,
-        onGenerateRoute: (settings) {
-          return MaterialPageRoute(
-            builder: (context) => StellarView(),
-          );
-        },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Navigator(
+              key: navigatorKey,
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(
+                  builder: (context) => StellarView(),
+                );
+              },
+            ),
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Image.asset(
+                  'assets/images/logo_uju.png',
+                  height: 32, // 이미지의 높이를 48로 고정
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
