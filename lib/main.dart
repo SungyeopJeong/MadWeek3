@@ -5,7 +5,6 @@ import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
-import 'package:week3/views/note_view.dart';
 import 'package:week3/views/stellar_view.dart';
 import 'package:week3/views/intro_view.dart';
 
@@ -23,7 +22,8 @@ class MainApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NoteViewModel()),
         ChangeNotifierProvider(create: (_) => GraphViewModel()),
       ],
-      child: MaterialApp(
+      child: const MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: IntroScreen(), // 변경된 부분: IntroScreen을 초기 화면으로 설정
       ),
     );
@@ -34,11 +34,12 @@ class SplitScreen extends StatefulWidget {
   const SplitScreen({Key? key}) : super(key: key);
 
   @override
-  _SplitScreenState createState() => _SplitScreenState();
+  State<SplitScreen> createState() => _SplitScreenState();
 }
 
 class _SplitScreenState extends State<SplitScreen> {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<StellarViewState> stellarKey = GlobalKey();
   bool isNodeListVisible = false;
 
   // 스플릿 뷰의 너비 상태를 추가합니다.
@@ -69,7 +70,7 @@ class _SplitScreenState extends State<SplitScreen> {
   // 사이드 뷰를 구성하는 별도의 함수
   Widget _buildSideView() {
     return AnimatedPositioned(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       left: isNodeListVisible ? 0 : -200, // 사이드 뷰가 보이거나 숨겨질 때의 위치
       top: 0,
@@ -87,7 +88,7 @@ class _SplitScreenState extends State<SplitScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(8.0), // 여기에 패딩을 추가합니다.
                   child: IconButton(
-                    icon: Icon(Icons.keyboard_double_arrow_left,
+                    icon: const Icon(Icons.keyboard_double_arrow_left,
                         color: Colors.white),
                     onPressed: toggleNodeList,
                   ),
@@ -107,7 +108,7 @@ class _SplitScreenState extends State<SplitScreen> {
   // 메인 내비게이터를 구성하는 별도의 함수
   Widget _buildMainNavigator() {
     return AnimatedPositioned(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       left: isNodeListVisible ? 200 : 0,
       right: 0,
@@ -120,7 +121,7 @@ class _SplitScreenState extends State<SplitScreen> {
               key: navigatorKey,
               onGenerateRoute: (settings) {
                 return MaterialPageRoute(
-                  builder: (context) => StellarView(),
+                  builder: (context) => StellarView(key: stellarKey),
                 );
               },
             ),
@@ -144,7 +145,7 @@ class _SplitScreenState extends State<SplitScreen> {
   // FAB를 구성하는 별도의 함수
   Widget _buildFAB() {
     return AnimatedPositioned(
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       top: 16,
       left: 16,
@@ -161,12 +162,12 @@ class _SplitScreenState extends State<SplitScreen> {
                 color: MyColor.shadow, // 색상의 투명도 조절
                 spreadRadius: 0,
                 blurRadius: 4,
-                offset: Offset(0, 0), // 그림자 위치 조절
+                offset: const Offset(0, 0), // 그림자 위치 조절
               ),
             ],
             borderRadius: BorderRadius.circular(12), // 라운드 조절
           ),
-          child: Icon(Icons.menu, color: MyColor.onSurface),
+          child: const Icon(Icons.menu, color: MyColor.onSurface),
         ),
       ),
     );
@@ -195,12 +196,15 @@ class _SplitScreenState extends State<SplitScreen> {
     // 별자리에 대한 타일에는 들여쓰기를 적용하지 않습니다.
     return ExpansionTile(
       title: Text(constellation.post.title,
-          style: TextStyle(color: MyColor.onSurface)),
+          style: const TextStyle(color: MyColor.onSurface)),
       children: graphViewModel
           .starsInConstellation(constellation)
           .map((star) => _buildStarTile(star, graphViewModel,
               depth: 1)) // 별에 대한 타일에는 들여쓰기를 1단계 적용
           .toList(),
+      onExpansionChanged: (isExpanded) {
+        if (isExpanded) stellarKey.currentState?.openNote(constellation);
+      },
     );
   }
 
@@ -213,13 +217,15 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ExpansionTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child:
-              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
+          child: Text(star.post.title, style: const TextStyle(color: MyColor.onSurface)),
         ),
         children: star.planets
             .map((planet) => _buildPlanetTile(planet,
                 depth: depth + 1)) // 행성에 대한 타일에는 들여쓰기를 1단계 더 적용
             .toList(),
+        onExpansionChanged: (isExpanded) {
+          if (isExpanded) stellarKey.currentState?.openNote(star);
+        },
       );
     } else {
       // 행성이 없는 별에 대한 타일에는 들여쓰기를 적용하지 않습니다.
@@ -227,10 +233,11 @@ class _SplitScreenState extends State<SplitScreen> {
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
           child:
-              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
+              Text(star.post.title, style: const TextStyle(color: MyColor.onSurface)),
         ),
         onTap: () {
           // 별 상세 정보 표시
+          stellarKey.currentState?.openNote(star);
         },
       );
     }
@@ -243,10 +250,11 @@ class _SplitScreenState extends State<SplitScreen> {
       title: Padding(
         padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
         child:
-            Text(planet.post.title, style: TextStyle(color: MyColor.onSurface)),
+            Text(planet.post.title, style: const TextStyle(color: MyColor.onSurface)),
       ),
       onTap: () {
         // 행성 상세 정보 표시
+        stellarKey.currentState?.openNote(planet);
       },
     );
   }

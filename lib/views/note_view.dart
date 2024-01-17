@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import 'package:week3/const/color.dart';
+import 'package:week3/models/edge.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
@@ -174,6 +175,29 @@ class _NoteViewState extends State<NoteView> {
               onPressed: () {
                 Navigator.of(context).pop(); // 대화상자 닫기
                 context.read<GraphViewModel>().removeNode(widget.node);
+                if (widget.node is Star) {
+                  final edges = context.read<GraphViewModel>().edges;
+                  final addEdges = [];
+                  for (final edge1 in edges) {
+                    for (final edge2 in edges) {
+                      if (edge1 == edge2) continue;
+                      if (edge1.contains(widget.node) &&
+                          edge2.contains(widget.node)) {
+                        addEdges.add(Edge(edge1.other(widget.node)!,
+                            edge2.other(widget.node)!));
+                      }
+                    }
+                  }
+                  for (Edge edge in addEdges) {
+                    context
+                        .read<GraphViewModel>()
+                        .addEdge(edge.start, edge.end);
+                  }
+                  context
+                      .read<GraphViewModel>()
+                      .edges
+                      .removeWhere((edge) => edge.contains(widget.node));
+                }
                 widget.onClose();
               },
             ),

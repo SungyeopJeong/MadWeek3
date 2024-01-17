@@ -22,10 +22,10 @@ class StellarView extends StatefulWidget {
   const StellarView({super.key});
 
   @override
-  State<StellarView> createState() => _StellarViewState();
+  State<StellarView> createState() => StellarViewState();
 }
 
-class _StellarViewState extends State<StellarView>
+class StellarViewState extends State<StellarView>
     with TickerProviderStateMixin {
   //late Graph graph;
   Node? origin;
@@ -346,12 +346,13 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildDeletingNode(Node node, Widget Function(Offset) childBuilder) {
+    final distance = (node.pos - Offset(MediaQuery.of(context).size.width * 2, 0)).distance.toInt();
     return TweenAnimationBuilder(
       tween: Tween(
         begin: node.pos,
         end: Offset(MediaQuery.of(context).size.width * 2, 0),
       ),
-      duration: Duration(milliseconds: 250),
+      duration: Duration(milliseconds: 2 * distance),
       onEnd: () {
         setState(() {
           context.read<GraphViewModel>().removeNode(node);
@@ -459,15 +460,10 @@ class _StellarViewState extends State<StellarView>
         onPanEnd: (details) {
           setState(() {
             _setOnPanEnd(planet);
+            _push(context.read<GraphViewModel>().nodes.last);
           });
         },
-        onTap: () {
-          setState(() {
-            _focusOnNode(planet);
-            selectedNode = planet;
-            _showNoteViewDialogIfNeeded();
-          });
-        },
+        onTap: () => openNote(planet),
         child: _buildEmptyPlanet(planet),
       ),
     );
@@ -586,13 +582,15 @@ class _StellarViewState extends State<StellarView>
     isEditing = false;
     switch (node) {
       case Planet():
-        node.star.planets.remove(node);
-        context.read<GraphViewModel>().addNode(
-            Star(pos: origin!.pos)
-              ..post = node.post
-              ..planets = []
-              ..planetAnimation = AnimationController(vsync: this),
-            newPost: false);
+        if (!origin!.pos.closeTo(node.star.pos, starOrbitSize)) {
+          node.star.planets.remove(node);
+          context.read<GraphViewModel>().addNode(
+              Star(pos: origin!.pos)
+                ..post = node.post
+                ..planets = []
+                ..planetAnimation = AnimationController(vsync: this),
+              newPost: false);
+        }
         originEdge = null;
         origin = null;
       case Star():
@@ -727,7 +725,7 @@ class _StellarViewState extends State<StellarView>
     }
   }
 
-  void _openNote(Node node) {
+  void openNote(Node node) {
     setState(() {
       // 새 노드를 선택합니다.
       if (selectedNode != node) {
@@ -738,6 +736,7 @@ class _StellarViewState extends State<StellarView>
 
         selectedNode = node; // 새로운 노드를 선택된 노드로 설정합니다.
         if (selectedNode is Star) _showOrbit(selectedNode as Star);
+        if (selectedNode is Planet) _showOrbit((selectedNode as Planet).star);
 
         // 새 노드의 정보로 텍스트 필드를 업데이트합니다.
         context.read<NoteViewModel>().titleController.text =
@@ -784,9 +783,28 @@ class _StellarViewState extends State<StellarView>
           _setOnPanEnd(star);
           _hideOrbit(star);
           star.isDeleting = isBlackholeEnabled;
+          if (star.isDeleting) {
+            final edges = context.read<GraphViewModel>().edges;
+            final addEdges = [];
+            for (final edge1 in edges) {
+              for (final edge2 in edges) {
+                if (edge1 == edge2) continue;
+                if (edge1.contains(star) && edge2.contains(star)) {
+                  addEdges.add(Edge(edge1.other(star)!, edge2.other(star)!));
+                }
+              }
+            }
+            for (Edge edge in addEdges) {
+              context.read<GraphViewModel>().addEdge(edge.start, edge.end);
+            }
+            context
+                .read<GraphViewModel>()
+                .edges
+                .removeWhere((edge) => edge.contains(star));
+          }
         });
       },
-      onTap: () => _openNote(star),
+      onTap: () => openNote(star),
       child: _buildColoredCircle(
         starAreaSize,
         visible ? MyColor.starArea : Colors.transparent,
@@ -942,7 +960,9 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _convexHull(Constellation constellation) {
-    if (!isEditing || constellation.starsPos.isEmpty) {
+    if (!isEditing ||
+        constellation.starsPos.isEmpty ||
+        constellation.stars.any((star) => star.isDeleting)) {
       const spare = 10;
       const radius = (starTotalSize + spare) / 2;
       final leftTop = Offset(-radius, -radius),
@@ -950,6 +970,7 @@ class _StellarViewState extends State<StellarView>
           leftBottom = Offset(-radius, radius),
           rightBottom = Offset(radius, radius);
       final points = constellation.stars
+          .where((star) => !star.isDeleting)
           .expand((star) => [
                 star.pos + leftTop,
                 star.pos + rightTop,
@@ -1019,13 +1040,7 @@ class _StellarViewState extends State<StellarView>
           });
         },
         child: GestureDetector(
-          onTap: () {
-            setState(() {
-              _focusOnNode(constellation);
-              selectedNode = constellation;
-              _showNoteViewDialogIfNeeded();
-            });
-          },
+          onTap: () => openNote(constellation),
           child: CustomPaint(
             size: Size(maxX - minX, maxY - minY),
             painter: EdgePainter(
@@ -1041,10 +1056,14 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildConstellation(Constellation constellation) {
-    if (!isEditing || constellation.pos == Offset.zero) {
+    if (!isEditing ||
+        constellation.pos == Offset.zero ||
+        constellation.stars.any((star) => star.isDeleting)) {
       final center = constellation.stars
+              .where((star) => !star.isDeleting)
               .fold(Offset.zero, (prev, star) => prev + star.pos) /
-          constellation.stars.length.toDouble();
+          (constellation.stars.where((star) => !star.isDeleting).length)
+              .toDouble();
       constellation.pos = center;
     }
     return Positioned(

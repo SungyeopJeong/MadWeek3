@@ -31,6 +31,13 @@ class Graph extends ChangeNotifier {
 
   void removeNode(Node node) {
     nodes.remove(node);
+    if (node is Star) {
+      final index = node.constellation?.stars.indexOf(node);
+      if (index != null) {
+        node.constellation!.stars.removeAt(index);
+        node.constellation!.starsPos.removeAt(index);
+      }
+    }
     notifyListeners(); // 상태 변경 알림
   }
 }
