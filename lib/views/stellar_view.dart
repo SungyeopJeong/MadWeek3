@@ -13,6 +13,7 @@ import 'package:week3/extensions/offset.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
+import 'package:week3/utils/geometry.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/views/note_view.dart';
@@ -52,12 +53,6 @@ class _StellarViewState extends State<StellarView>
 
   final _exception = Exception('Unable to classify');
 
-  bool isMenuVisible = false;
-  late AnimationController _menuAnimationController;
-  late Animation<Offset> _menuSlideAnimation;
-  // 메뉴 호버링 상태를 추적하는 변수 추가
-  bool _menuHovering = false;
-
   late AnimationController _pushAnimationController;
   late Animation<double> _pushAnimation;
 
@@ -75,20 +70,6 @@ class _StellarViewState extends State<StellarView>
     _currentScale =
         (_transformationController.value.getMaxScaleOnAxis() - _minScale) /
             (_maxScale - _minScale);
-
-    // 메뉴 애니메이션 컨트롤러 초기화
-    _menuAnimationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 250), // 메뉴가 나오는 데 걸리는 시간
-    );
-    // 메뉴 슬라이드 애니메이션 정의
-    _menuSlideAnimation = Tween<Offset>(
-      begin: Offset(-1, 0), // 메뉴가 왼쪽에서 시작
-      end: Offset(0, 0), // 메뉴가 화면에 완전히 나옴
-    ).animate(CurvedAnimation(
-      parent: _menuAnimationController,
-      curve: Curves.easeInOut,
-    ));
 
     _pushAnimationController =
         AnimationController(vsync: this, duration: Duration(milliseconds: 250));
@@ -117,8 +98,6 @@ class _StellarViewState extends State<StellarView>
     // AnimationController 정리
     _animationController.dispose();
 
-    // 컨트롤러 정리
-    _menuAnimationController.dispose();
     super.dispose();
   }
 
@@ -943,11 +922,10 @@ class _StellarViewState extends State<StellarView>
               ])
           .toList();
 
-      double ccw(Offset a, Offset b, Offset c) {
-        return (b.dx - a.dx) * (c.dy - a.dy) - (c.dx - a.dx) * (b.dy - a.dy);
-      }
-
-      points.sort((a, b) => a.dy.compareTo(b.dy));
+      points.sort((a, b) {
+        final compareY = a.dy.compareTo(b.dy);
+        return compareY == 0 ? a.dx.compareTo(b.dx) : compareY;
+      });
       points.sort((a, b) {
         final c = ccw(points[0], a, b);
         if (c == 0) {
@@ -983,9 +961,46 @@ class _StellarViewState extends State<StellarView>
       }
       constellation.starsPos = order.map((e) => points[e]).toList();
     }
-    return CustomPaint(
-      size: Size(double.maxFinite, double.maxFinite),
-      painter: EdgePainter(corners: constellation.starsPos),
+    final sorted = [...constellation.starsPos]
+      ..sort((a, b) => a.dy.compareTo(b.dy));
+    final minY = sorted.first.dy;
+    final maxY = sorted.last.dy;
+    sorted.sort((a, b) => a.dx.compareTo(b.dx));
+    final minX = sorted.first.dx;
+    final maxX = sorted.last.dx;
+    return Positioned(
+      left: minX,
+      top: minY,
+      child: MouseRegion(
+        onHover: (details) {
+          setState(() {
+            constellation.isIn = isIn(
+              details.localPosition,
+              constellation.starsPos
+                  .map((e) => e - Offset(minX, minY))
+                  .toList(),
+            );
+          });
+        },
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              _focusOnNode(constellation);
+              selectedNode = constellation;
+              _showNoteViewDialogIfNeeded();
+            });
+          },
+          child: CustomPaint(
+            size: Size(maxX - minX, maxY - minY),
+            painter: EdgePainter(
+              corners: constellation.starsPos
+                  .map((e) => e - Offset(minX, minY))
+                  .toList(),
+              onHover: constellation.isIn,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1167,10 +1182,17 @@ class EdgePainter extends CustomPainter {
   final List<Edge>? edges;
   final List<Offset>? corners;
   final Edge? originEdge;
+  final bool onHover;
 
   static const radius = 10.0;
 
-  EdgePainter({this.edges, this.corners, this.originEdge});
+  EdgePainter(
+      {this.edges, this.corners, this.originEdge, this.onHover = false});
+
+  @override
+  bool? hitTest(Offset position) {
+    return isIn(position, corners);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1179,10 +1201,11 @@ class EdgePainter extends CustomPainter {
       final p2 = edge.end.pos;
       final paint = Paint()
         ..color = MyColor.line
-        ..strokeWidth = 1;
+        ..strokeWidth = onHover ? 4 : 1
+        ..strokeCap = StrokeCap.round;
 
       final unit = (p2 - p1) / (p2 - p1).distance;
-      final gap = unit * (starAreaSize + starSize) / 4;
+      final gap = onHover ? Offset.zero : unit * (starAreaSize + starSize) / 4;
 
       canvas.drawLine(p1 + gap, p2 - gap, paint);
     }
@@ -1247,8 +1270,13 @@ class EdgePainter extends CustomPainter {
         drawCircle(points[i], points[i + 1], points[i + 2]);
       }*/
       for (int i = 0; i < corners!.length; i++) {
-        drawDashedLine(Edge(Node(pos: corners![i]),
-            Node(pos: corners![(i + 1) % corners!.length])));
+        final edge = Edge(Node(pos: corners![i]),
+            Node(pos: corners![(i + 1) % corners!.length]));
+        if (onHover) {
+          drawLine(edge);
+          continue;
+        }
+        drawDashedLine(edge);
       }
     }
     if (originEdge != null) drawDashedLine(originEdge!);
