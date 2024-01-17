@@ -1,14 +1,23 @@
 import 'package:flutter/foundation.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/node.dart';
+import 'package:week3/models/post.dart';
 
 class Graph extends ChangeNotifier {
   List<Node> nodes = [];
   List<Edge> edges = [];
-  int _newId = 1;
+  int _newId = 1, _newConstellationId = 1;
 
-  void addNode(Node node) {
-    nodes.add(node..id = _newId++);
+  void addNode(Node node, {bool newPost = true}) {
+    nodes.add(node
+      ..id = (node is Constellation) ? _newConstellationId++ : _newId++
+      ..post = newPost
+          ? Post(
+              title: (node is Constellation)
+                  ? 'Constellation ${node.id}'
+                  : 'Star ${node.id}',
+            )
+          : node.post);
     notifyListeners(); // 상태 변경 알림
   }
 

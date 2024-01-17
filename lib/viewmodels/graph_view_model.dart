@@ -9,8 +9,8 @@ class GraphViewModel extends ChangeNotifier {
   List<Node> get nodes => _graph.nodes;
   List<Edge> get edges => _graph.edges;
 
-  void addNode(Node node) {
-    _graph.addNode(node);
+  void addNode(Node node, {bool newPost = true}) {
+    _graph.addNode(node, newPost: newPost);
     notifyListeners(); // 상태 변경 알림
   }
 
