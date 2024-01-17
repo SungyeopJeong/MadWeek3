@@ -24,7 +24,8 @@ class GraphViewModel extends ChangeNotifier {
       ..planets = [];
     for (final planet in json['planets']) {
       newStar.addPlanet(
-          Planet(star: newStar)..post = Post.fromJson(planet['post']));
+          Planet(star: newStar)..post = Post.fromJson(planet['post']),
+          newPost: false);
     }
     return newStar;
   }
