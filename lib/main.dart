@@ -176,8 +176,8 @@ class _SplitScreenState extends State<SplitScreen> {
       Constellation constellation, GraphViewModel graphViewModel) {
     // 별자리에 대한 타일에는 들여쓰기를 적용하지 않습니다.
     return ExpansionTile(
-      title:
-          Text(constellation.post.title, style: TextStyle(color: Colors.white)),
+      title: Text(constellation.post.title,
+          style: TextStyle(color: MyColor.onSurface)),
       children: graphViewModel
           .starsInConstellation(constellation)
           .map((star) => _buildStarTile(star, graphViewModel,
@@ -195,7 +195,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ExpansionTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+          child:
+              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
         ),
         children: star.planets
             .map((planet) => _buildPlanetTile(planet,
@@ -207,7 +208,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ListTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+          child:
+              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
         ),
         onTap: () {
           // 별 상세 정보 표시
@@ -222,7 +224,8 @@ class _SplitScreenState extends State<SplitScreen> {
     return ListTile(
       title: Padding(
         padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-        child: Text(planet.post.title, style: TextStyle(color: Colors.white)),
+        child:
+            Text(planet.post.title, style: TextStyle(color: MyColor.onSurface)),
       ),
       onTap: () {
         // 행성 상세 정보 표시

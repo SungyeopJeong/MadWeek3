@@ -121,7 +121,7 @@ class _NoteViewState extends State<NoteView> {
     return Row(
       children: [
         IconButton(
-          icon: Icon(isExpanded ? Icons.compress : Icons.expand),
+          icon: Icon(isExpanded ? Icons.close_fullscreen : Icons.open_in_full),
           onPressed: _togglePopupSize,
         ),
         SizedBox(width: 2), // 간격 조절
