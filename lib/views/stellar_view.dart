@@ -459,6 +459,7 @@ class _StellarViewState extends State<StellarView>
         onPanEnd: (details) {
           setState(() {
             _setOnPanEnd(planet);
+            _push(context.read<GraphViewModel>().nodes.last);
           });
         },
         onTap: () {
@@ -586,13 +587,15 @@ class _StellarViewState extends State<StellarView>
     isEditing = false;
     switch (node) {
       case Planet():
-        node.star.planets.remove(node);
-        context.read<GraphViewModel>().addNode(
-            Star(pos: origin!.pos)
-              ..post = node.post
-              ..planets = []
-              ..planetAnimation = AnimationController(vsync: this),
-            newPost: false);
+        if (!origin!.pos.closeTo(node.star.pos, starOrbitSize)) {
+          node.star.planets.remove(node);
+          context.read<GraphViewModel>().addNode(
+              Star(pos: origin!.pos)
+                ..post = node.post
+                ..planets = []
+                ..planetAnimation = AnimationController(vsync: this),
+              newPost: false);
+        }
         originEdge = null;
         origin = null;
       case Star():
