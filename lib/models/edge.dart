@@ -23,4 +23,8 @@ class Edge {
       end = to;
     }
   }
+
+  bool contains(Node node) {
+    return start == node || end == node;
+  }
 }

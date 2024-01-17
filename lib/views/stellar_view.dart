@@ -787,6 +787,9 @@ class _StellarViewState extends State<StellarView>
           _setOnPanEnd(star);
           _hideOrbit(star);
           star.isDeleting = isBlackholeEnabled;
+          if (star.isDeleting) {
+            context.read<GraphViewModel>().edges.removeWhere((edge) => edge.contains(star));
+          }
         });
       },
       onTap: () => _openNote(star),
@@ -945,7 +948,9 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _convexHull(Constellation constellation) {
-    if (!isEditing || constellation.starsPos.isEmpty) {
+    if (!isEditing ||
+        constellation.starsPos.isEmpty ||
+        constellation.stars.any((star) => star.isDeleting)) {
       const spare = 10;
       const radius = (starTotalSize + spare) / 2;
       final leftTop = Offset(-radius, -radius),
@@ -953,6 +958,7 @@ class _StellarViewState extends State<StellarView>
           leftBottom = Offset(-radius, radius),
           rightBottom = Offset(radius, radius);
       final points = constellation.stars
+          .where((star) => !star.isDeleting)
           .expand((star) => [
                 star.pos + leftTop,
                 star.pos + rightTop,
@@ -1044,10 +1050,14 @@ class _StellarViewState extends State<StellarView>
   }
 
   Widget _buildConstellation(Constellation constellation) {
-    if (!isEditing || constellation.pos == Offset.zero) {
+    if (!isEditing ||
+        constellation.pos == Offset.zero ||
+        constellation.stars.any((star) => star.isDeleting)) {
       final center = constellation.stars
+              .where((star) => !star.isDeleting)
               .fold(Offset.zero, (prev, star) => prev + star.pos) /
-          constellation.stars.length.toDouble();
+          (constellation.stars.where((star) => !star.isDeleting).length)
+              .toDouble();
       constellation.pos = center;
     }
     return Positioned(
