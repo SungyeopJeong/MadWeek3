@@ -207,7 +207,6 @@ class _StellarViewState extends State<StellarView>
         if (mode == Mode.add) {
           setState(() {
             Star newStar = Star(pos: details.localPosition)
-              ..post = Post(title: 'New Star')
               ..planets = []
               ..planetAnimation = AnimationController(vsync: this);
 
@@ -580,9 +579,7 @@ class _StellarViewState extends State<StellarView>
               break;
             }
             if (consO == null && consN == null) {
-              final newConstellation = Constellation()
-                ..stars = [other, node]
-                ..post = Post(title: 'New Constellation');
+              final newConstellation = Constellation()..stars = [other, node];
               context.read<GraphViewModel>().addNode(newConstellation);
               //graph.addNode(newConstellation);
               other.constellation = newConstellation;
