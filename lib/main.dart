@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:week3/const/color.dart';
 import 'package:week3/models/graph.dart';
@@ -7,6 +10,7 @@ import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/views/stellar_view.dart';
 import 'package:week3/views/intro_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MainApp());
@@ -46,6 +50,15 @@ class _SplitScreenState extends State<SplitScreen> {
   double nodeListWidth = 0;
 
   Graph graph = Graph(); // 그래프 객체
+
+  void saveToJsonFile(List<Map<String, dynamic>> map) async {
+    final sp = await SharedPreferences.getInstance();
+    sp.setString(
+        'data',
+        jsonEncode({
+          'data': map,
+        }));
+  }
 
   void toggleNodeList() {
     setState(() {
@@ -98,6 +111,20 @@ class _SplitScreenState extends State<SplitScreen> {
             // 나머지 공간을 차지하는 노드 리스트
             Expanded(
               child: _buildNodeList(),
+            ),
+            Align(
+              alignment: Alignment.topLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0), // 여기에 패딩을 추가합니다.
+                child: IconButton(
+                  icon: const Icon(Icons.save, color: Colors.white),
+                  onPressed: () => saveToJsonFile(
+                      context.read<GraphViewModel>().nodes.map((e) {
+                    if (e is Star) return e.toJson();
+                    return (e as Constellation).toJson();
+                  }).toList()),
+                ),
+              ),
             ),
           ],
         ),
@@ -217,7 +244,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ExpansionTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child: Text(star.post.title, style: const TextStyle(color: MyColor.onSurface)),
+          child: Text(star.post.title,
+              style: const TextStyle(color: MyColor.onSurface)),
         ),
         children: star.planets
             .map((planet) => _buildPlanetTile(planet,
@@ -232,8 +260,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ListTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child:
-              Text(star.post.title, style: const TextStyle(color: MyColor.onSurface)),
+          child: Text(star.post.title,
+              style: const TextStyle(color: MyColor.onSurface)),
         ),
         onTap: () {
           // 별 상세 정보 표시
@@ -249,8 +277,8 @@ class _SplitScreenState extends State<SplitScreen> {
     return ListTile(
       title: Padding(
         padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-        child:
-            Text(planet.post.title, style: const TextStyle(color: MyColor.onSurface)),
+        child: Text(planet.post.title,
+            style: const TextStyle(color: MyColor.onSurface)),
       ),
       onTap: () {
         // 행성 상세 정보 표시

@@ -1,13 +1,57 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:week3/extensions/offset.dart';
 import 'package:week3/models/Graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
+import 'package:week3/models/post.dart';
 
 class GraphViewModel extends ChangeNotifier {
   final Graph _graph = Graph();
 
   List<Node> get nodes => _graph.nodes;
   List<Edge> get edges => _graph.edges;
+
+  GraphViewModel() {
+    loadFromJsonFile();
+  }
+
+  Star _jsonToStar(Map<String, dynamic> json) {
+    final newStar = Star(pos: OffsetExt.fromJson(json['pos']))
+      ..post = Post.fromJson(json['post'])
+      ..planets = [];
+    for (final planet in json['planets']) {
+      newStar.addPlanet(
+          Planet(star: newStar)..post = Post.fromJson(planet['post']));
+    }
+    return newStar;
+  }
+
+  void loadFromJsonFile() async {
+    final sp = await SharedPreferences.getInstance();
+    final string = sp.getString('data');
+    if (string != null) {
+      final map = jsonDecode(string);
+      for (final node in map['data']) {
+        if ((node as Map).containsKey('stars')) {
+          /*final newConstellation =
+              Constellation(pos: OffsetExt.fromJson(node['pos']))
+                ..post = Post.fromJson(node['post'])
+                ..stars = [];
+          for (final star in node['stars']) {
+            newConstellation.stars.add(_jsonToStar(star));
+          }
+          _graph.addNode(newConstellation, newPost: false);*/
+        } else {
+          _graph.addNode(_jsonToStar(node as Map<String, dynamic>),
+              newPost: false);
+        }
+      }
+    }
+    notifyListeners();
+  }
 
   void addNode(Node node, {bool newPost = true}) {
     _graph.addNode(node, newPost: newPost);

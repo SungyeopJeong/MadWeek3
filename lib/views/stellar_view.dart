@@ -223,7 +223,7 @@ class StellarViewState extends State<StellarView>
 
             (selectedNode as Star).showOrbit = true;
             (selectedNode as Star)
-                .planetAnimation
+                .planetAnimation!
                 .repeat(period: Duration(seconds: 20));
 
             mode = Mode.none;
@@ -542,15 +542,15 @@ class StellarViewState extends State<StellarView>
 
   void _showOrbit(Star star) {
     star.showOrbit = true;
-    if (!star.planetAnimation.isAnimating) {
-      star.planetAnimation.repeat(period: Duration(seconds: 20));
+    if (!star.planetAnimation!.isAnimating) {
+      star.planetAnimation!.repeat(period: Duration(seconds: 20));
     }
   }
 
   void _hideOrbit(Star star) {
     star.showOrbit = false;
-    if (star.planetAnimation.isAnimating) {
-      star.planetAnimation.stop();
+    if (star.planetAnimation!.isAnimating) {
+      star.planetAnimation!.stop();
     }
   }
 
@@ -816,6 +816,7 @@ class StellarViewState extends State<StellarView>
     if (!isEditing && !star.showOrbit && selectedNode == star) {
       _showOrbit(star);
     }
+    star.planetAnimation ??= AnimationController(vsync: this);
     return Visibility(
       visible: star.showOrbit,
       child: _buildHelper(
@@ -827,9 +828,9 @@ class StellarViewState extends State<StellarView>
             border: Border.all(color: MyColor.star),
           ),
           AnimatedBuilder(
-            animation: star.planetAnimation,
+            animation: star.planetAnimation!,
             builder: (_, __) {
-              final alpha = star.planetAnimation.value * 2 * pi;
+              final alpha = star.planetAnimation!.value * 2 * pi;
               const radius = starOrbitSize / 2;
               for (final planetWithIndex in star.planets.indexed) {
                 final index = planetWithIndex.$1;
@@ -866,7 +867,7 @@ class StellarViewState extends State<StellarView>
         starTotalSize,
         [
           AnimatedBuilder(
-            animation: star.planetAnimation,
+            animation: star.planetAnimation!,
             builder: (_, __) => Stack(
               clipBehavior: Clip.none,
               children: star.planets

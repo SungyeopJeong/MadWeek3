@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:week3/extensions/offset.dart';
 import 'package:week3/models/post.dart';
 
 class Node {
@@ -32,6 +33,11 @@ class Planet extends Node {
     this.isDeleting = false,
     this.isOrigin = false,
   });
+
+  Map<String, dynamic> toJson() => {
+        'pos': pos.toJson(),
+        'post': post.toJson(),
+      };
 }
 
 class Star extends Node {
@@ -39,7 +45,7 @@ class Star extends Node {
   late List<Planet> planets;
   bool showStar, showArea, showOrbit, isDeleting;
   Offset? pushedPos;
-  late AnimationController planetAnimation;
+  AnimationController? planetAnimation;
 
   int _newId = 1;
 
@@ -59,6 +65,12 @@ class Star extends Node {
       ..id = _newId++
       ..post = newPost ? Post(title: 'Planet ${planet.id}') : planet.post);
   }
+
+  Map<String, dynamic> toJson() => {
+        'pos': pos.toJson(),
+        'post': post.toJson(),
+        'planets': planets.map((e) => e.toJson()).toList(),
+      };
 }
 
 class Constellation extends Node {
@@ -69,4 +81,10 @@ class Constellation extends Node {
   Constellation({
     super.pos = Offset.zero,
   });
+
+  Map<String, dynamic> toJson() => {
+        'pos': pos.toJson(),
+        'post': post.toJson(),
+        'stars': stars.map((e) => e.toJson()).toList(),
+      };
 }
