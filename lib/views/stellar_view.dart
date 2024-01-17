@@ -444,6 +444,21 @@ class _StellarViewState extends State<StellarView>
         }
       },
       child: GestureDetector(
+        onPanStart: (details) {
+          setState(() {
+            _setOnPanStart(planet);
+          });
+        },
+        onPanUpdate: (details) {
+          setState(() {
+            origin!.pos += details.delta;
+          });
+        },
+        onPanEnd: (details) {
+          setState(() {
+            _setOnPanEnd(planet);
+          });
+        },
         onTap: () {
           setState(() {
             _focusOnNode(planet);
@@ -545,7 +560,11 @@ class _StellarViewState extends State<StellarView>
     isEditing = true;
     switch (node) {
       case Planet():
-        throw UnimplementedError();
+        origin = Star(pos: node.pos, showStar: true)
+          ..id = 0
+          ..planets = []
+          ..planetAnimation = AnimationController(vsync: this);
+        originEdge = Edge(origin!, node);
       case Star():
         origin = Star(pos: node.pos, showStar: false)
           ..id = 0
@@ -565,7 +584,15 @@ class _StellarViewState extends State<StellarView>
     isEditing = false;
     switch (node) {
       case Planet():
-        throw UnimplementedError();
+        node.star.planets.remove(node);
+        context.read<GraphViewModel>().addNode(
+            Star(pos: origin!.pos)
+              ..post = node.post
+              ..planets = []
+              ..planetAnimation = AnimationController(vsync: this),
+            newPost: false);
+        originEdge = null;
+        origin = null;
       case Star():
         for (final edge in context.read<GraphViewModel>().edges) {
           edge.replaceIfcontains(origin!, node);
@@ -609,7 +636,8 @@ class _StellarViewState extends State<StellarView>
             _hideOrbit(other as Star);
 
             if (other.planets.remove(tempPlanet)) {
-              other.addPlanet(Planet(star: other));
+              other.addPlanet(Planet(star: other)..post = node.post,
+                  newPost: false);
               tempPlanet = null;
               isNodeRemoved = true;
               node.showStar = true;

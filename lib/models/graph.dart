@@ -8,14 +8,16 @@ class Graph extends ChangeNotifier {
   List<Edge> edges = [];
   int _newId = 1, _newConstellationId = 1;
 
-  void addNode(Node node) {
+  void addNode(Node node, {bool newPost = true}) {
     nodes.add(node
       ..id = (node is Constellation) ? _newConstellationId++ : _newId++
-      ..post = Post(
-        title: (node is Constellation)
-            ? 'Constellation ${node.id}'
-            : 'Star ${node.id}',
-      ));
+      ..post = newPost
+          ? Post(
+              title: (node is Constellation)
+                  ? 'Constellation ${node.id}'
+                  : 'Star ${node.id}',
+            )
+          : node.post);
     notifyListeners(); // 상태 변경 알림
   }
 
