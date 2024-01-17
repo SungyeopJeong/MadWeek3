@@ -10,7 +10,6 @@ import 'package:week3/const/size.dart';
 import 'package:week3/const/text.dart';
 import 'package:week3/enums/mode.dart';
 import 'package:week3/extensions/offset.dart';
-import 'package:week3/models/graph.dart';
 import 'package:week3/models/node.dart';
 import 'package:week3/models/edge.dart';
 import 'package:week3/models/post.dart';
@@ -285,7 +284,6 @@ class _StellarViewState extends State<StellarView>
                   originEdge: originEdge,
                 ),
               ),
-              
               ...graphViewModel.nodes
                   .whereType<Constellation>()
                   .map((e) => _convexHull(e)),
@@ -371,11 +369,7 @@ class _StellarViewState extends State<StellarView>
     return TweenAnimationBuilder(
       tween: Tween(
         begin: node.pos,
-        end: Offset(
-            0,
-            MediaQuery.of(context)
-                .size
-                .height), // 이 깂 출력해서 블랙홀로 제대로 빨려들어가는지 확인해보기
+        end: Offset(MediaQuery.of(context).size.width * 2, 0),
       ),
       duration: Duration(milliseconds: 250),
       onEnd: () {
@@ -1013,8 +1007,8 @@ class _StellarViewState extends State<StellarView>
     final blackholeSize =
         isBlackholeEnabled ? blackholeMaxSize : blackholeMinSize;
     return Positioned(
-      left: -blackholeAreaSize / 2,
-      bottom: -blackholeAreaSize / 2,
+      right: -blackholeAreaSize / 2,
+      top: -blackholeAreaSize / 2,
       child: MouseRegion(
         onEnter: (_) {
           setState(() {
@@ -1046,18 +1040,19 @@ class _StellarViewState extends State<StellarView>
 
   // 줌슬라이더 만드는 함수
   Widget _buildZoomSlider() {
+    final screenHeight = MediaQuery.of(context).size.height;
     return Positioned(
-      left: 32,
-      top: (MediaQuery.of(context).size.height - 320) / 2,
+      right: 32,
+      top: screenHeight * 3 / 8,
       child: Container(
-        width: 48,
-        height: 320,
+        width: 32,
+        height: screenHeight / 4,
         decoration: BoxDecoration(
           color: Color(0xFFE5E5E1),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: MyColor.shadow,
               blurRadius: 4,
               offset: Offset(0, 0),
             ),
@@ -1092,7 +1087,7 @@ class _StellarViewState extends State<StellarView>
         inactiveTrackColor: Color(0xFFC5C5C5),
         activeTrackColor: Color(0xFF4D4D4D),
         overlayColor: Colors.transparent,
-        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 10.0),
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5.0),
         trackShape: RoundedRectSliderTrackShape(),
       ),
       child: slider,
@@ -1141,10 +1136,10 @@ class _StellarViewState extends State<StellarView>
     final Matrix4 startMatrix = _transformationController.value;
     // 최종 행렬
     final Matrix4 endMatrix = Matrix4.identity()
-      ..scale(3.0)
+      ..scale(1.5)
       ..translate(
-        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 3,
-        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 3,
+        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 1.5,
+        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 1.5,
       );
 
     // Tween을 사용하여 시작과 끝 행렬 사이를 보간합니다.
