@@ -140,6 +140,8 @@ class _StellarViewState extends State<StellarView>
   }
 
   void _showNoteViewDialogIfNeeded() {
+    Provider.of<NoteViewModel>(context, listen: false)
+        .updatePopupWidth(false); // 처음 열면 무조건 작게 열리게 설정
     if (isStarSelected) {
       showGeneralDialog(
         context: context,

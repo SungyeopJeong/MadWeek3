@@ -7,6 +7,7 @@ import 'package:week3/viewmodels/note_view_model.dart';
 import 'package:week3/viewmodels/graph_view_model.dart';
 import 'package:week3/views/note_view.dart';
 import 'package:week3/views/stellar_view.dart';
+import 'package:week3/views/intro_view.dart';
 
 void main() {
   runApp(const MainApp());
@@ -23,7 +24,7 @@ class MainApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GraphViewModel()),
       ],
       child: MaterialApp(
-        home: SplitScreen(),
+        home: IntroScreen(), // 변경된 부분: IntroScreen을 초기 화면으로 설정
       ),
     );
   }
@@ -112,13 +113,30 @@ class _SplitScreenState extends State<SplitScreen> {
       right: 0,
       top: 0,
       bottom: 0,
-      child: Navigator(
-        key: navigatorKey,
-        onGenerateRoute: (settings) {
-          return MaterialPageRoute(
-            builder: (context) => StellarView(),
-          );
-        },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Navigator(
+              key: navigatorKey,
+              onGenerateRoute: (settings) {
+                return MaterialPageRoute(
+                  builder: (context) => StellarView(),
+                );
+              },
+            ),
+            Positioned(
+              top: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Image.asset(
+                  'assets/images/logo_uju.png',
+                  height: 32, // 이미지의 높이를 48로 고정
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -176,8 +194,8 @@ class _SplitScreenState extends State<SplitScreen> {
       Constellation constellation, GraphViewModel graphViewModel) {
     // 별자리에 대한 타일에는 들여쓰기를 적용하지 않습니다.
     return ExpansionTile(
-      title:
-          Text(constellation.post.title, style: TextStyle(color: Colors.white)),
+      title: Text(constellation.post.title,
+          style: TextStyle(color: MyColor.onSurface)),
       children: graphViewModel
           .starsInConstellation(constellation)
           .map((star) => _buildStarTile(star, graphViewModel,
@@ -195,7 +213,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ExpansionTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+          child:
+              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
         ),
         children: star.planets
             .map((planet) => _buildPlanetTile(planet,
@@ -207,7 +226,8 @@ class _SplitScreenState extends State<SplitScreen> {
       tile = ListTile(
         title: Padding(
           padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-          child: Text(star.post.title, style: TextStyle(color: Colors.white)),
+          child:
+              Text(star.post.title, style: TextStyle(color: MyColor.onSurface)),
         ),
         onTap: () {
           // 별 상세 정보 표시
@@ -222,7 +242,8 @@ class _SplitScreenState extends State<SplitScreen> {
     return ListTile(
       title: Padding(
         padding: EdgeInsets.only(left: 16.0 * depth), // depth에 따른 들여쓰기
-        child: Text(planet.post.title, style: TextStyle(color: Colors.white)),
+        child:
+            Text(planet.post.title, style: TextStyle(color: MyColor.onSurface)),
       ),
       onTap: () {
         // 행성 상세 정보 표시
