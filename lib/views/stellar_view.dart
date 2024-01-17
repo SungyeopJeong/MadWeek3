@@ -462,13 +462,7 @@ class _StellarViewState extends State<StellarView>
             _push(context.read<GraphViewModel>().nodes.last);
           });
         },
-        onTap: () {
-          setState(() {
-            _focusOnNode(planet);
-            selectedNode = planet;
-            _showNoteViewDialogIfNeeded();
-          });
-        },
+        onTap: () => () => _openNote(planet),
         child: _buildEmptyPlanet(planet),
       ),
     );
@@ -788,7 +782,23 @@ class _StellarViewState extends State<StellarView>
           _hideOrbit(star);
           star.isDeleting = isBlackholeEnabled;
           if (star.isDeleting) {
-            context.read<GraphViewModel>().edges.removeWhere((edge) => edge.contains(star));
+            final edges = context.read<GraphViewModel>().edges;
+            final addEdges = [];
+            for (final edge1 in edges) {
+              for (final edge2 in edges) {
+                if (edge1 == edge2) continue;
+                if (edge1.contains(star) && edge2.contains(star)) {
+                  addEdges.add(Edge(edge1.other(star)!, edge2.other(star)!));
+                }
+              }
+            }
+            for (Edge edge in addEdges) {
+              context.read<GraphViewModel>().addEdge(edge.start, edge.end);
+            }
+            context
+                .read<GraphViewModel>()
+                .edges
+                .removeWhere((edge) => edge.contains(star));
           }
         });
       },
@@ -1028,13 +1038,7 @@ class _StellarViewState extends State<StellarView>
           });
         },
         child: GestureDetector(
-          onTap: () {
-            setState(() {
-              _focusOnNode(constellation);
-              selectedNode = constellation;
-              _showNoteViewDialogIfNeeded();
-            });
-          },
+          onTap: () => _openNote(constellation),
           child: CustomPaint(
             size: Size(maxX - minX, maxY - minY),
             painter: EdgePainter(
