@@ -222,7 +222,7 @@ class _StellarViewState extends State<StellarView>
             (selectedNode as Star).showOrbit = true;
             (selectedNode as Star)
                 .planetAnimation
-                .repeat(period: Duration(seconds: 10));
+                .repeat(period: Duration(seconds: 20));
 
             mode = Mode.none;
             try {
@@ -443,7 +443,16 @@ class _StellarViewState extends State<StellarView>
           });
         }
       },
-      child: _buildEmptyPlanet(planet),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _focusOnNode(planet);
+            selectedNode = planet;
+            _showNoteViewDialogIfNeeded();
+          });
+        },
+        child: _buildEmptyPlanet(planet),
+      ),
     );
   }
 
@@ -521,14 +530,14 @@ class _StellarViewState extends State<StellarView>
   void _showOrbit(Star star) {
     star.showOrbit = true;
     if (!star.planetAnimation.isAnimating) {
-      star.planetAnimation.repeat(period: Duration(seconds: 10));
+      star.planetAnimation.repeat(period: Duration(seconds: 20));
     }
   }
 
   void _hideOrbit(Star star) {
     star.showOrbit = false;
     if (star.planetAnimation.isAnimating) {
-      star.planetAnimation.reset();
+      star.planetAnimation.stop();
     }
   }
 
@@ -874,7 +883,7 @@ class _StellarViewState extends State<StellarView>
             );
             if (details.localPosition.closeTo(
               OffsetExt.center(starTotalSize),
-              starOrbitSize,
+              starOrbitSize + planetAreaSize,
             )) {
               _showOrbit(star);
             } else {
@@ -1144,14 +1153,15 @@ class _StellarViewState extends State<StellarView>
   void _focusOnNode(Node node) {
     if (node is Star) node.showArea = false;
 
+    final double scale = node is Planet ? 3.0 : 1.5;
     // 시작 행렬
     final Matrix4 startMatrix = _transformationController.value;
     // 최종 행렬
     final Matrix4 endMatrix = Matrix4.identity()
-      ..scale(1.5)
+      ..scale(scale)
       ..translate(
-        -node.pos.dx + MediaQuery.of(context).size.width / 3 / 1.5,
-        -node.pos.dy + MediaQuery.of(context).size.height / 2 / 1.5,
+        -node.pos.dx + MediaQuery.of(context).size.width / 3 / scale,
+        -node.pos.dy + MediaQuery.of(context).size.height / 2 / scale,
       );
 
     // Tween을 사용하여 시작과 끝 행렬 사이를 보간합니다.
