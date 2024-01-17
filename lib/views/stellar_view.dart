@@ -346,12 +346,13 @@ class StellarViewState extends State<StellarView>
   }
 
   Widget _buildDeletingNode(Node node, Widget Function(Offset) childBuilder) {
+    final distance = (node.pos - Offset(MediaQuery.of(context).size.width * 2, 0)).distance.toInt();
     return TweenAnimationBuilder(
       tween: Tween(
         begin: node.pos,
         end: Offset(MediaQuery.of(context).size.width * 2, 0),
       ),
-      duration: Duration(milliseconds: 250),
+      duration: Duration(milliseconds: 2 * distance),
       onEnd: () {
         setState(() {
           context.read<GraphViewModel>().removeNode(node);
